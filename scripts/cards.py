@@ -32,8 +32,8 @@ DESK = [
 ]
 
 CSS = f"""
-@font-face {{ font-family: 'BSD'; font-weight: 100 900; src: url('file://{FONTS}/@fontsource-variable/montserrat/files/montserrat-latin-wght-normal.woff2'); }}
-@font-face {{ font-family: 'HG'; font-weight: 100 900; src: url('file://{FONTS}/@fontsource-variable/montserrat/files/montserrat-latin-wght-normal.woff2'); }}
+@font-face {{ font-family: 'BSD'; font-weight: 100 900; src: url('file://{FONTS}/@fontsource-variable/roboto/files/roboto-latin-wght-normal.woff2'); }}
+@font-face {{ font-family: 'HG'; font-weight: 100 900; src: url('file://{FONTS}/@fontsource-variable/roboto/files/roboto-latin-wght-normal.woff2'); }}
 * {{ box-sizing: border-box; margin: 0; }}
 body {{ background: #0b0d10; font-family: 'HG', sans-serif; color: #f2f2ee; overflow: hidden; }}
 .card {{ position: relative; overflow: hidden; background: radial-gradient(900px 700px at 85% -5%, #1b3a8a66, transparent 60%), radial-gradient(700px 600px at 0% 100%, #2f6bff22, transparent 60%), #0e1116; }}
