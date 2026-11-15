@@ -7,7 +7,7 @@ import { DEFAULT_WARM, E1RM_LABEL, E1RM_TEXT, SCORE_LABEL, checkFormula, est1rm,
 import { api } from "../api";
 import { LINK_PAGE, connectMealcost, disconnectMealcost, syncMealcost, useMealcost } from "../mealcost";
 import { joinCoach, logout, syncNow, useSync } from "../sync";
-import { BUILD, canUpdate, checkUpdate, checkWebUpdate, installUpdate, isNative } from "../native";
+import { APK_URL, BUILD, canUpdate, checkUpdate, checkWebUpdate, installUpdate, isNative } from "../native";
 
 function save(name: string, text: string, type = "text/plain") {
   const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
@@ -145,6 +145,14 @@ export function More() {
           </div>))}</div>
         <p className="faint xs">Load step is how much the app adds once you hit the top of the rep range.</p>
       </section>
+
+      {!isNative && (
+        <section className="panel stack" style={{ padding: 16 }}>
+          <h3>Get the app</h3>
+          <p className="dim small">Android: download the APK, open it and allow installs from your browser when asked. Updates then install from inside the app. iPhone and iPad: in Safari tap Share, then Add to Home Screen. On a computer, use the install icon in the address bar.</p>
+          <a className="btn primary" style={{ justifySelf: "start" }} href={APK_URL}><Download size={18} /> Download for Android</a>
+        </section>
+      )}
 
       <section className="panel stack" style={{ padding: 16 }}>
         <h3>App updates</h3>

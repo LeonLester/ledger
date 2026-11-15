@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { authenticate } from "../sync";
 import { Seg } from "./common";
+import { APK_URL, isNative } from "../native";
 
 export function Auth() {
   const [mode, setMode] = useState<"login" | "signup">("login");
@@ -30,6 +31,7 @@ export function Auth() {
         </div>
         {err && <p role="alert" style={{ color: "var(--red)", margin: 0 }}>{err}</p>}
         <button className="btn primary" disabled={busy}>{busy ? "Please wait" : mode === "login" ? "Log in" : "Create account"}</button>
+        {!isNative && <p className="small"><a href={APK_URL} style={{ color: "var(--accent)" }}>Download the Android app</a>. On iPhone, tap Share, then Add to Home Screen.</p>}
         <p className="faint xs">Your log works offline once you are signed in. Changes sync when you are back online.</p>
       </form>
     </div>
