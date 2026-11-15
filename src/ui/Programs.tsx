@@ -5,6 +5,7 @@ import { LIFTS, LIFT_LABEL } from "../data/catalog";
 import { buildSplit, TEMPLATES, type Template } from "../data/templates";
 import { PROGRAMS, trainingMaxes, type Maxes, type Program } from "../data/programs";
 import { Seg, Sheet } from "./common";
+import { ProgramBuilder } from "./Builder";
 
 const Stepper = ({ label, value, min, max, onChange }: { label: string; value: number; min: number; max: number; onChange: (n: number) => void }) => (
   <div className="field"><span>{label}</span>
@@ -59,19 +60,20 @@ function PlConfig({ p, onClose, onDone }: { p: Program; onClose: () => void; onD
 }
 
 export function ProgramPicker({ onDone }: { onDone: () => void }) {
-  const [tab, setTab] = useState<"split" | "pl">("split");
+  const [tab, setTab] = useState<"split" | "pl" | "custom">("split");
+  const { createProgram } = useStore();
   const [t, setT] = useState<Template | null>(null);
   const [p, setP] = useState<Program | null>(null);
   return (
     <div className="stack">
-      <Seg full value={tab} onChange={setTab} options={[{ v: "split", label: "Hypertrophy splits" }, { v: "pl", label: "Powerlifting" }]} label="Program type" />
-      <div className="panel list">
+      <Seg full value={tab} onChange={setTab} options={[{ v: "split", label: "Splits" }, { v: "pl", label: "Powerlifting" }, { v: "custom", label: "Custom" }]} label="Program type" />
+      {tab === "custom" ? <ProgramBuilder saveLabel="Start this program" onSave={async (g) => { await createProgram(g); onDone(); }} /> : <div className="panel list">
         {tab === "split" ? TEMPLATES.map((x) => (
           <button key={x.id} className="sess-row" onClick={() => setT(x)}><div><div className="name" style={{ fontSize: "1.3rem" }}>{x.name}</div><div className="dim small">{x.blurb}</div></div><span className="pill">{x.opts ? "Custom" : `${x.sessions} days`}</span></button>
         )) : PROGRAMS.map((x) => (
           <button key={x.id} className="sess-row" onClick={() => setP(x)}><div><div className="name" style={{ fontSize: "1.3rem" }}>{x.name}</div><div className="dim small">{x.blurb}</div></div><span className="pill">{x.level}, {x.days}d</span></button>
         ))}
-      </div>
+      </div>}
       {t && <SplitConfig t={t} onClose={() => setT(null)} onDone={onDone} />}
       {p && <PlConfig p={p} onClose={() => setP(null)} onDone={onDone} />}
     </div>
@@ -85,7 +87,7 @@ export function Welcome() {
   return (
     <div className="main" style={{ maxWidth: 720, margin: "0 auto" }}>
       <div className="stack-lg">
-        <div className="page-head"><div><h1>Ledger</h1><p className="sub">An offline training log with auto-regulated sets, PR checks and bar path tracking. Everything stays on your device.</p></div></div>
+        <div className="page-head"><div><h1>Ledger</h1><p className="sub">An offline training log with auto-regulated sets, PR checks and bar path tracking. Your log works offline and syncs to your account.</p></div></div>
         {!picking ? (
           <div className="stack">
             <button className="panel sess-row" onClick={() => setPicking(true)}><div><div className="name">Pick a program</div><div className="dim small">Upper lower, PPL, full body, any X and Y split, or a powerlifting program.</div></div></button>

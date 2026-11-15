@@ -3,6 +3,8 @@ import { Tracker, analyze, toGray } from "../src/lib/barpath.ts";
 import { buildSplit, TEMPLATES } from "../src/data/templates.ts";
 import { PROGRAMS, trainingMaxes } from "../src/data/programs.ts";
 import { sessionPrs } from "../src/lib/pr.ts";
+import { parseSets } from "../src/lib/sheet.ts";
+import { expand } from "../src/lib/expand.ts";
 
 let fails = 0;
 const ok = (c, m) => { if (!c) { fails++; console.log("FAIL", m); } else console.log("ok  ", m); };
@@ -75,6 +77,20 @@ const h2 = [dated("x", 100, 1)];
 const cur = dated("y", 105, 2);
 const rel = sessionPrs(cur, [...h2, cur], bwHist, ctx).map((p) => p.kind);
 ok(rel.includes("relative") && rel.includes("bwband"), `bodyweight PRs: ${rel}`);
+
+// spreadsheet cell parsing
+const p1 = parseSets("100x8 100x8 95x9");
+ok(p1 && p1.length === 3 && p1[2].weight === 95 && p1[2].reps === 9, "sheet cell: three sets");
+const p2 = parseSets("60x12+4+3, 55 x 10");
+ok(p2 && p2.length === 2 && p2[0].myo.join() === "4,3" && p2[1].weight === 55, "sheet cell: myo reps and commas");
+ok(parseSets("abc") === null && parseSets("100x") === null, "sheet cell: rejects junk");
+ok(parseSets("62.5x8")?.[0].weight === 62.5, "sheet cell: decimal weight");
+// custom program expansion
+const base = [{ name: "A", items: [{ letter: "A", exercise: "Squat", sets: 4, repLo: 5, repHi: 8, rir: 2 }, { letter: "B", exercise: " ", sets: 3, repLo: 8, repHi: 12, rir: 2 }] }];
+const ex = expand(base, 5, 3, 1, true);
+ok(ex.length === 5 && ex[0].sessions[0].items[0].rir === 3 && ex[3].sessions[0].items[0].rir === 1, "custom block: RIR ramps");
+ok(ex[4].sessions[0].items[0].sets === 2 && ex[4].sessions[0].items[0].rir === 4, "custom block: deload halves sets");
+ok(ex[0].sessions[0].items.length === 1, "custom block: blank exercises dropped");
 
 console.log(fails ? `\n${fails} failed` : "\nall passed");
 process.exit(fails ? 1 : 0);

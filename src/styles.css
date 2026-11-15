@@ -53,7 +53,7 @@ p { margin: 0; max-width: 62ch; }
 /* shell */
 .app { display: grid; min-height: 100%; grid-template-rows: 1fr auto; }
 .main { padding: calc(env(safe-area-inset-top) + 18px) 16px calc(var(--nav) + env(safe-area-inset-bottom) + 28px); max-width: 780px; width: 100%; margin: 0 auto; }
-.nav { position: fixed; z-index: 20; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: repeat(5, 1fr); background: color-mix(in srgb, var(--bg) 92%, transparent); backdrop-filter: blur(14px); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); height: calc(var(--nav) + env(safe-area-inset-bottom)); }
+.nav { position: fixed; z-index: 20; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); background: color-mix(in srgb, var(--bg) 92%, transparent); backdrop-filter: blur(14px); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); height: calc(var(--nav) + env(safe-area-inset-bottom)); }
 .nav button { display: grid; place-items: center; align-content: center; gap: 3px; color: var(--faint); font-size: .72rem; font-weight: 600; min-height: 48px; }
 .nav button[aria-current=page] { color: var(--text); }
 .nav button[aria-current=page] svg { color: var(--accent); }
@@ -177,3 +177,11 @@ table.t { width: 100%; border-collapse: collapse; font-size: .92rem; } table.t t
 .canvas-wrap { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #000; }
 .canvas-wrap canvas { width: 100%; height: auto; display: block; cursor: crosshair; touch-action: none; }
 input[type=range] { width: 100%; accent-color: var(--accent); min-height: 36px; }
+
+/* spreadsheet-style log grid */
+.sheet-grid { border-collapse: collapse; width: max-content; min-width: 100%; }
+.sheet-grid th, .sheet-grid td { border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); white-space: nowrap; }
+.sheet-grid th:last-child, .sheet-grid td:last-child { border-right: 0; }
+.cell-in { width: 170px; min-height: 44px; padding: 8px 10px; background: transparent; border: 0; border-radius: 0; font-size: .9rem; }
+.cell-in::placeholder { color: var(--faint); }
+.cell-in:focus { outline: 2px solid var(--accent); outline-offset: -2px; background: var(--s2); }

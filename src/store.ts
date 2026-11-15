@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { db } from "./db";
+import { markAllDirty, resetRemote } from "./sync";
 import seedJson from "./data/seed.json";
 import type { Adjustment, BodyWeight, ExerciseDef, ExLog, Feedback, Meso, Seed, Session, Settings, SetLog, Unit } from "./types";
 import { defaultIncrement, isoDate, uid, worked } from "./lib/math";
@@ -33,6 +34,12 @@ interface State {
   bodyweight: BodyWeight[]; library: Record<string, ExerciseDef>; targets: Seed["targets"]; landmarks: Seed["landmarks"]; split: Seed["split"];
   openSession: string | null; update: import("./native").UpdateInfo | null; updateNote: string; rest: { until: number; total: number } | null; toast: string | null;
   init(): Promise<void>;
+  clear(): void;
+  saveSplit(split: Seed["split"]): void;
+  addLibrary(names: string[]): void;
+  sheetSets(mesoId: string, week: number, name: string, exercise: string, sets: SetLog[]): void;
+  saveMeso(meso: Meso): void;
+  deleteMeso(id: string): void;
   loadSample(): Promise<void>;
   createProgram(build: (id: string) => Generated): Promise<void>;
   setSettings(p: Partial<Settings>): void;
@@ -58,6 +65,40 @@ const persistSession = (s: Session) => void db.sessions.put(s);
 export const useStore = create<State>((set, get) => ({
   ready: false, settings: DEFAULTS, mesos: [], sessions: [], feedback: [], adjustments: [], bodyweight: [],
   library: {}, targets: seed.targets, landmarks: seed.landmarks, split: [], openSession: null, update: null, updateNote: "", rest: null, toast: null,
+
+  clear() { set({ ready: false, settings: DEFAULTS, mesos: [], sessions: [], feedback: [], adjustments: [], bodyweight: [], library: {}, split: [], openSession: null, rest: null }); },
+  saveSplit(split) { set({ split }); void db.kv.put({ key: "split", value: split }); },
+  addLibrary(names) {
+    const lib = { ...get().library }; let n = 0;
+    for (const name of names) {
+      if (!name || lib[name]) continue;
+      const base = CAT[name.replace(/ \(T2\)$/, "")];
+      lib[name] = { name, muscle: base?.muscle ?? guessMuscle(name), unit: base?.unit ?? "kg", increment: base?.inc ?? defaultIncrement("kg") }; n++;
+    }
+    if (n) { set({ library: lib }); void db.kv.put({ key: "library", value: lib }); }
+  },
+  /** Spreadsheet-style entry: replaces the sets of one exercise in a session, creating the session as logged when it does not exist. */
+  sheetSets(mesoId, week, name, exercise, sets) {
+    const { sessions, mesos, settings, library } = get();
+    const id = `${mesoId}w${week}-${name}`;
+    const found = sessions.find((s) => s.id === id);
+    const planned = mesos.find((m) => m.id === mesoId)?.weeks.find((w) => w.week === week)?.sessions.find((s) => s.name === name);
+    const fresh = (): Session => ({ id, athleteId: settings.athleteId, meso: mesoId, week, name, date: null, status: "done", exercises: [], finished: Date.now() });
+    const base = found ?? fresh();
+    const has = base.exercises.some((e) => e.exercise === exercise);
+    const plannedItem = planned?.items.find((i) => i.exercise === exercise);
+    const exercises = has ? base.exercises.map((e) => (e.exercise === exercise ? { ...e, sets } : e))
+      : [...base.exercises, { letter: plannedItem?.letter ?? String.fromCharCode(65 + base.exercises.length), exercise, unit: library[exercise]?.unit ?? "kg", rir: plannedItem?.rir ?? null, note: null, sets } as ExLog];
+    const next: Session = { ...base, exercises: exercises.filter((e) => e.sets.length > 0 || e.exercise !== exercise) };
+    set({ sessions: found ? sessions.map((s) => (s.id === id ? next : s)) : [...sessions, next] });
+    persistSession(next);
+  },
+  saveMeso(meso) {
+    const row = { ...meso, athleteId: get().settings.athleteId };
+    set({ mesos: get().mesos.some((m) => m.id === meso.id) ? get().mesos.map((m) => (m.id === meso.id ? row : m)) : [...get().mesos, row] });
+    void db.mesos.put(row);
+  },
+  deleteMeso(id) { set({ mesos: get().mesos.filter((m) => m.id !== id) }); void db.mesos.delete(id); },
 
   async init() {
     let st = await db.settings.get("main");
@@ -95,6 +136,7 @@ export const useStore = create<State>((set, get) => ({
       await db.kv.put({ key: "split", value: seed.split });
       await db.settings.put({ ...DEFAULTS, week: maxWeek, onboarded: true, key: "main" });
     });
+    await markAllDirty();
     await get().init();
   },
 
@@ -272,13 +314,14 @@ export const useStore = create<State>((set, get) => ({
   async importAll(json) {
     const d = JSON.parse(json);
     if (d.app !== "ledger") throw new Error("This file is not a Ledger backup.");
+    await resetRemote();
     await db.delete(); await db.open();
     await db.settings.put({ ...d.settings, key: "main" });
     await db.mesos.bulkPut(d.mesos); await db.sessions.bulkPut(d.sessions); await db.feedback.bulkPut(d.feedback ?? []);
     await db.adjustments.bulkPut(d.adjustments ?? []); await db.bodyweight.bulkPut(d.bodyweight ?? []); await db.kv.put({ key: "library", value: d.library });
     await get().init();
   },
-  async resetAll() { await db.delete(); await db.open(); set({ sessions: [], mesos: [], feedback: [], adjustments: [], bodyweight: [] }); await get().init(); },
+  async resetAll() { await resetRemote(); await db.delete(); await db.open(); set({ sessions: [], mesos: [], feedback: [], adjustments: [], bodyweight: [] }); await get().init(); },
 }));
 
 export type { SetLog, Unit };

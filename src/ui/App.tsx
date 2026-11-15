@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { BarChart3, CalendarRange, Dumbbell, Settings2, TrendingUp } from "lucide-react";
+import { BarChart3, CalendarRange, Dumbbell, Settings2, TrendingUp, Users } from "lucide-react";
 import { useStore } from "../store";
 import { Train } from "./Train";
 import { Plan } from "./Plan";
@@ -8,10 +8,13 @@ import { Progress } from "./Progress";
 import { More } from "./More";
 import { Welcome } from "./Programs";
 import { canUpdate, checkUpdate } from "../native";
+import { Auth } from "./Auth";
+import { Coach } from "./Coach";
+import { resume, setAfterPull, useSync } from "../sync";
 
 const TABS = [
   { id: "train", label: "Train", Icon: Dumbbell }, { id: "plan", label: "Plan", Icon: CalendarRange },
-  { id: "volume", label: "Volume", Icon: BarChart3 }, { id: "progress", label: "Progress", Icon: TrendingUp }, { id: "more", label: "More", Icon: Settings2 },
+  { id: "volume", label: "Volume", Icon: BarChart3 }, { id: "progress", label: "Progress", Icon: TrendingUp }, { id: "coach", label: "Clients", Icon: Users }, { id: "more", label: "More", Icon: Settings2 },
 ] as const;
 
 function RestBar() {
@@ -40,26 +43,34 @@ function RestBar() {
 }
 
 export function App() {
-  const { ready, init, settings, toast, openSession } = useStore();
+  const { ready, settings, toast, openSession } = useStore();
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("train");
-  useEffect(() => { void init(); }, [init]);
+  const { phase, user } = useSync();
+  useEffect(() => { if (user?.role === "coach" && !settings.onboarded) setTab("coach"); }, [user?.role, settings.onboarded]);
+  useEffect(() => {
+    setAfterPull(async () => { if (useSync.getState().user) await useStore.getState().init(); else useStore.getState().clear(); });
+    void resume();
+  }, []);
   useEffect(() => { if (canUpdate) checkUpdate().then((u) => u && useStore.setState({ update: u })).catch(() => {}); }, []);
   useEffect(() => {
     const r = document.documentElement;
     if (settings.theme === "auto") r.removeAttribute("data-theme"); else r.setAttribute("data-theme", settings.theme);
   }, [settings.theme]);
-  if (!ready) return <div className="main"><h1>Ledger</h1></div>;
-  if (!settings.onboarded) return <Welcome />;
+  if (phase === "out") return <Auth />;
+  if (phase === "booting" || !ready) return <div className="main"><h1>Ledger</h1><p className="sub">Loading your log</p></div>;
+  const noProgram = !settings.onboarded;
+  if (noProgram && user?.role !== "coach") return <Welcome />;
   return (
     <div className="app">
       <nav className="nav" aria-label="Main">
         <div className="brand">Ledger</div>
-        {TABS.map(({ id, label, Icon }) => (
+        {TABS.filter((t) => t.id !== "coach" || user?.role === "coach").map(({ id, label, Icon }) => (
           <button key={id} aria-current={tab === id ? "page" : undefined} onClick={() => { setTab(id); if (id !== "train") useStore.getState().closeSession(); }}><Icon size={22} strokeWidth={2.2} />{label}</button>
         ))}
       </nav>
       <main className="main" id="main" data-open={openSession ? "1" : undefined}>
-        {tab === "train" && <Train />}{tab === "plan" && <Plan />}{tab === "volume" && <Volume />}{tab === "progress" && <Progress />}{tab === "more" && <More />}
+        {noProgram && ["train", "plan", "volume", "progress"].includes(tab) ? <Welcome /> : <>
+          {tab === "train" && <Train />}{tab === "plan" && <Plan />}{tab === "volume" && <Volume />}{tab === "progress" && <Progress />}{tab === "coach" && <Coach />}{tab === "more" && <More />}</>}
       </main>
       <RestBar />
       {toast && <div className="toast" role="status">{toast}</div>}

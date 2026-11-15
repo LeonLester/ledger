@@ -6,6 +6,7 @@ import { useStore } from "../store";
 import { bestE1rm, defaultIncrement, fmtW, PLATE_COLORS, plateLoad, warmups, workedSets } from "../lib/math";
 import { effectiveSessions, feedbackDelta, pumpLabels, sorenessLabels, suggestTarget, workloadLabels } from "../lib/progression";
 import { lastLog, parseReps, repsText, sortSessions } from "../lib/selectors";
+import { SessionComments } from "./CoachInbox";
 import type { ExLog, SetLog } from "../types";
 import { Seg, Sheet } from "./common";
 
@@ -52,6 +53,8 @@ export function SessionView({ id }: { id: string }) {
         <div><h2 style={{ lineHeight: 1 }}>{sess.name}</h2><div className="dim small">Week {sess.week}, {done} of {total} sets</div></div>
         {readOnly ? <button className="btn" onClick={() => st.reopenSession(id)}>Edit</button> : <button className="btn primary" onClick={() => (settings.mode === "sheet" ? st.finishSession(id, {}) : setFinishing(true))}>Finish</button>}
       </header>
+
+      <SessionComments sessionId={id} />
 
       {needSoreness.length > 0 && (
         <section className="panel stack" style={{ padding: 16, marginBottom: 14 }} aria-label="Soreness check">

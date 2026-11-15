@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
-import { useStore } from "../store";
+import { useData } from "../lib/view";
 import { LIFTS, LIFT_LABEL, LIFT_NAME } from "../data/catalog";
 import { bestE1rm, fmtW, topSet, workedSets } from "../lib/math";
 import { PR_LABEL, repMax, sessionPrs } from "../lib/pr";
 import { sessionDate, sortSessions } from "../lib/selectors";
 import type { LiftKey } from "../types";
-import { LineChart } from "./common";
+import { LineChart, Seg } from "./common";
 
 const DOTS = {
   m: [-307.75076, 24.0900756, -0.1918759221, 0.0007391293, -0.000001093],
@@ -17,7 +17,7 @@ export const dots = (total: number, bw: number, sex: "m" | "f") => {
 };
 
 export function Strength() {
-  const { sessions, settings, setSettings, library, bodyweight } = useStore();
+  const { sessions, settings, setSettings, library, bodyweight } = useData();
   const [sel, setSel] = useState<LiftKey>("squat");
   const done = useMemo(() => sortSessions(sessions.filter((s) => s.status === "done")), [sessions]);
   // when the standard exercise has no history, fall back to the most-logged exercise that looks like the lift
@@ -40,7 +40,9 @@ export function Strength() {
   const total = best.squat + best.bench + best.deadlift;
   const bw = bodyweight.length ? [...bodyweight].sort((a, b) => a.date.localeCompare(b.date)).slice(-1)[0].kg : null;
   const rows = per[sel];
-  const pts = rows.map((r, i) => ({ x: i, y: bestE1rm(r.e) ?? 0, label: `M${r.s.meso.slice(1)}W${r.s.week}` })).filter((p) => p.y > 0);
+  const [range, setRange] = useState(0);
+  const allPts = rows.map((r, i) => ({ x: i, y: bestE1rm(r.e) ?? 0, label: `M${r.s.meso.slice(1)}W${r.s.week}` })).filter((p) => p.y > 0);
+  const pts = (range ? allPts.slice(-range) : allPts).map((p, i) => ({ ...p, x: i }));
 
   // weekly rollup for the selected lift
   const weekly = useMemo(() => {
@@ -85,6 +87,7 @@ export function Strength() {
 
       <section className="panel stack" style={{ padding: 16 }}>
         <h3>{LIFT_LABEL[sel]} e1RM</h3>
+        <Seg value={range} onChange={setRange} label="Chart range" options={[{ v: 8, label: "Last 8" }, { v: 16, label: "Last 16" }, { v: 32, label: "Last 32" }, { v: 0, label: "All" }]} />
         <LineChart points={pts} unit="kg" />
         {best[sel] > 0 && <>
           <h3>Rep maxes at this e1RM</h3>
@@ -107,7 +110,7 @@ export function Strength() {
 }
 
 export function Records() {
-  const { sessions, bodyweight, settings, split, library } = useStore();
+  const { sessions, bodyweight, settings, split, library } = useData();
   const ctx = { mesoStart: settings.mesoStart, split };
   const done = useMemo(() => sortSessions(sessions.filter((s) => s.status === "done")), [sessions]);
   const feed = useMemo(() => done.slice(-14).reverse().map((s) => ({ s, prs: sessionPrs(s, sessions, bodyweight, ctx) })).filter((x) => x.prs.length), [done, bodyweight]);

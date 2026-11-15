@@ -28,7 +28,7 @@ const DAYS: Record<string, { note: string; slots: Slot[] }> = {
   Posterior: { note: "Hamstrings, glutes, back, biceps", slots: [["hinge", 3, 6, 10], ["ham", 3, 10, 15], ["glute", 3, 8, 12], ["vpull", 3, 8, 12], ["hpull", 3, 8, 12], ["rear", 3, 12, 20], ["biceps", 3, 8, 12]] },
 };
 
-const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+export const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const SPREAD: Record<number, number[]> = { 1: [0], 2: [0, 3], 3: [0, 2, 4], 4: [0, 1, 3, 4], 5: [0, 1, 2, 4, 5], 6: [0, 1, 2, 3, 4, 5], 7: [0, 1, 2, 3, 4, 5, 6] };
 
 export interface Opts { freq: number; upper: number; lower: number }

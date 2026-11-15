@@ -4,6 +4,8 @@ import { useStore } from "../store";
 import { sessionDate, sortSessions } from "../lib/selectors";
 import { Seg } from "./common";
 import { epley } from "../lib/math";
+import { api } from "../api";
+import { joinCoach, logout, syncNow, useSync } from "../sync";
 import { BUILD, canUpdate, checkUpdate, checkWebUpdate, installUpdate, isNative } from "../native";
 
 function save(name: string, text: string, type = "text/plain") {
@@ -15,6 +17,8 @@ export function More() {
   const st = useStore();
   const { settings, setSettings, library, sessions, split, muscleOf } = st;
   const [q, setQ] = useState("");
+  const [code, setCode] = useState("");
+  const acct = useSync();
   const file = useRef<HTMLInputElement>(null);
   const muscles = [...new Set(Object.values(library).map((d) => d.muscle))].sort();
   const dated = sortSessions(sessions).map((s) => ({ s, d: sessionDate(s, settings.mesoStart, split) }));
@@ -35,6 +39,18 @@ export function More() {
   return (
     <div className="stack-lg">
       <div className="page-head"><div><h1>More</h1><p className="sub">Settings, exercise library and your data.</p></div></div>
+
+
+      <section className="panel stack" style={{ padding: 16 }}>
+        <h3>Account</h3>
+        <div><b>{acct.user?.name}</b><div className="dim small">{acct.user?.email}{acct.user?.role === "coach" ? ", coach" : ""}</div></div>
+        <p className="dim small" role="status">{acct.status === "syncing" ? "Syncing" : acct.status === "offline" ? "Offline. Changes sync when you are back online." : acct.status === "error" ? `Sync problem: ${acct.error}` : acct.last ? `Synced at ${new Date(acct.last).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "Not synced yet"}</p>
+        {acct.user?.role === "coach" ? <p className="small">Your coach code is <b className="num" style={{ letterSpacing: ".1em" }}>{acct.user.invite}</b>. Clients enter it when they sign up.</p>
+          : acct.user?.coachId ? <div className="row between wrap"><span className="small">Your coach: <b>{acct.user.coachName ?? "linked"}</b>. They can see your log and send programs and feedback.</span><button className="btn sm" onClick={() => confirm("Stop sharing your log with your coach?") && api("/api/join", {}).then(() => { useSync.setState({ user: { ...acct.user!, coachId: null, coachName: null } }); })}>Leave coach</button></div>
+            : <div className="row"><input className="input" style={{ maxWidth: 180 }} placeholder="Coach code" aria-label="Coach code" autoCapitalize="characters" value={code} onChange={(e) => setCode(e.target.value)} /><button className="btn" disabled={!code.trim()} onClick={() => joinCoach(code.trim()).then(() => { st.say("Linked to your coach"); setCode(""); }).catch((e) => st.say(e.message))}>Join a coach</button></div>}
+        <div className="row wrap"><button className="btn" onClick={() => void syncNow()}>Sync now</button><button className="btn" onClick={() => void logout()}>Log out</button>
+          <button className="btn danger" onClick={() => confirm("Delete your account and all synced data? This cannot be undone. The copy on this device stays until you erase it.") && api("/api/account", undefined, "DELETE").then(() => logout(false)).catch((e) => st.say(e.message))}>Delete account</button></div>
+      </section>
 
       <section className="panel stack" style={{ padding: 16 }}>
         <h3>Training</h3>
@@ -78,7 +94,7 @@ export function More() {
 
       <section className="panel stack" style={{ padding: 16 }}>
         <h3>Your data</h3>
-        <p className="dim small">Everything is stored on this device and works offline. Back it up before clearing browser data.</p>
+        <p className="dim small">Your log is stored on this device, works offline and syncs to your account. A backup file is still worth keeping.</p>
         <div className="row wrap">
           <button className="btn" onClick={async () => save(`ledger-backup-${new Date().toISOString().slice(0, 10)}.json`, await st.exportAll(), "application/json")}><Download size={18} /> Backup (JSON)</button>
           <button className="btn" onClick={() => file.current?.click()}><Upload size={18} /> Restore backup</button>
@@ -87,7 +103,7 @@ export function More() {
         </div>
         {undated > 0 && <p className="faint xs">{undated} older sessions have no date. Set the mesocycle start date above and they are dated by your weekly split.</p>}
         <input ref={file} type="file" accept="application/json" hidden onChange={async (e) => { const f = e.target.files?.[0]; if (!f) return; try { await st.importAll(await f.text()); st.say("Backup restored"); } catch (err) { st.say((err as Error).message); } e.target.value = ""; }} />
-        <button className="btn danger" style={{ justifySelf: "start" }} onClick={() => confirm("Erase everything on this device? Back up first if you want to keep it.") && st.resetAll()}>Erase all data</button>
+        <button className="btn danger" style={{ justifySelf: "start" }} onClick={() => confirm("Erase all your data, on this device and in your account? Back up first if you want to keep it.") && st.resetAll()}>Erase all data</button>
       </section>
     </div>
   );

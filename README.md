@@ -24,8 +24,11 @@ Regenerate the seed from the workbook: `SRC="/path/Training Log Leo 2026.xlsx" n
 - Android: `.github/workflows/android.yml` builds a signed APK on every push to `main` and publishes `ledger.apk` to the `android-latest` release (notes carry "Build N"). The app checks that release, shows an Update banner, downloads the APK inside the app and opens the system installer. Same signing key every build, so updates install over the old app and keep your data. Optional secrets: `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`.
 - First install on the phone: open https://github.com/LeonLester/ledger/releases/tag/android-latest, download `ledger.apk`, allow installs from your browser.
 
-## Cloudflare (phase 2)
-`wrangler.jsonc` deploys `dist/` as static assets. Next: D1 for sync (every row already has `athleteId`), Access or passkeys for auth, a Worker API, custom domain.
+## Accounts, sync and coaching
+- `worker/index.ts` is the API (Cloudflare Worker, D1 database `ledger`, binding `DB`). Tables are created on first request. Static files are still served from `dist/`; only `/api/*` runs the Worker.
+- Everyone signs up or logs in when the app opens. The log is still local first (IndexedDB, one database per account) and works offline; changes queue in an outbox and sync when online (last write wins per row). The first login on a device adopts any data from the earlier single-user version.
+- Coach accounts are created by ticking "I am a coach" at sign-up and entering the `COACH_KEY` secret (`npx wrangler secret put COACH_KEY`). A coach has a code; clients enter it at sign-up or under More. The Clients tab shows each client's log, progress, sheet, lets the coach leave feedback and assign programs (one of their own, or built from scratch). Clients see assignments and feedback on Train and Plan.
+- Local development: `npm run build && npx wrangler dev` serves the app and API together. Put `COACH_KEY=...` in `.dev.vars`.
 
 ## Programs, records and bar path
 
@@ -35,3 +38,6 @@ Regenerate the seed from the workbook: `SRC="/path/Training Log Leo 2026.xlsx" n
 - **Strength** (Progress): e1RM per lift, SBD total, DOTS, rep max table, weekly sets, tonnage, intensity, RPE and technique rating.
 - **Technique and bar path** (video icon on any exercise): rate technique, tag faults, or load a side-on video, mark the plate centre and edge (45 cm sets the scale) and the app tracks the bar on device. It reports range of motion, mean and peak concentric velocity, velocity loss and horizontal drift per rep, and stores the path with the set.
 - `npm test` checks the tracker, split and program generators and the PR engine.
+- **Custom programs** (New program, Custom): any sessions, exercises, sets, rep ranges, RIR ramp, block length and weekly layout. **Edit sessions** changes an existing block for one week, from a week onward or all weeks. **Edit week** moves sessions between days.
+- **Log sheet** (Plan): spreadsheet view of a block, sessions as tables with weeks as columns. Type `100x8 100x8 95x9` into a cell.
+- **Progress, Trends**: pick lifts from a dropdown, overlay up to six on one chart (actual load or % of first), choose date or session on the x axis and the range.

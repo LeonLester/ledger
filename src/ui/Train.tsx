@@ -4,6 +4,7 @@ import { effectiveSessions, pumpLabels } from "../lib/progression";
 import { SessionView } from "./SessionView";
 import { Seg } from "./common";
 import { installUpdate } from "../native";
+import { CoachInbox } from "./CoachInbox";
 
 export function Train() {
   const { update, openSession, settings, mesos, sessions, adjustments, split, feedback, muscleOf, setSettings, startSession, resolveFeedback } = useStore();
@@ -27,6 +28,8 @@ export function Train() {
         <div><h1>{meso.name}</h1><p className="sub">Week {week} of {weeks.length}{meso.deload !== false && week === weeks[weeks.length - 1] ? ", deload" : ""}</p></div>
         <Seg value={settings.mode} onChange={(mode) => setSettings({ mode })} options={[{ v: "sheet", label: "Sheet" }, { v: "feedback", label: "Feedback" }, { v: "auto", label: "Auto" }]} label="Progression mode" />
       </div>
+
+      <CoachInbox />
 
       {update?.available && (
         <section className="panel row between wrap" style={{ padding: 14 }} role="status">
