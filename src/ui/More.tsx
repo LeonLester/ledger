@@ -44,6 +44,7 @@ export function More() {
         <label className="field"><span>Rest timer (seconds)</span><input className="input num" inputMode="numeric" value={settings.restSec} onChange={(e) => setSettings({ restSec: Math.max(15, Number(e.target.value) || 150) })} /></label>
         <div className="row"><label className="field" style={{ flex: 1 }}><span>Bar (kg)</span><input className="input num" inputMode="decimal" value={settings.bar} onChange={(e) => setSettings({ bar: Number(e.target.value) || 20 })} /></label>
           <label className="field" style={{ flex: 2 }}><span>Plates per side (kg)</span><input className="input num" defaultValue={settings.plates.join(", ")} onBlur={(e) => setSettings({ plates: e.target.value.split(/[ ,]+/).map(Number).filter((n) => n > 0) })} /></label></div>
+        <div className="field"><span>Effort scale</span><Seg full value={settings.effort ?? "rir"} onChange={(effort) => setSettings({ effort })} options={[{ v: "rir", label: "RIR" }, { v: "rpe", label: "RPE" }]} label="Effort scale" /></div>
         <div className="field"><span>Theme</span><Seg full value={settings.theme} onChange={(theme) => { setSettings({ theme }); }} options={[{ v: "auto", label: "System" }, { v: "dark", label: "Dark" }, { v: "light", label: "Light" }]} /></div>
       </section>
 
@@ -86,7 +87,7 @@ export function More() {
         </div>
         {undated > 0 && <p className="faint xs">{undated} older sessions have no date. Set the mesocycle start date above and they are dated by your weekly split.</p>}
         <input ref={file} type="file" accept="application/json" hidden onChange={async (e) => { const f = e.target.files?.[0]; if (!f) return; try { await st.importAll(await f.text()); st.say("Backup restored"); } catch (err) { st.say((err as Error).message); } e.target.value = ""; }} />
-        <button className="btn danger" style={{ justifySelf: "start" }} onClick={() => confirm("Erase everything and reload your imported training history?") && st.resetAll()}>Reset to imported history</button>
+        <button className="btn danger" style={{ justifySelf: "start" }} onClick={() => confirm("Erase everything on this device? Back up first if you want to keep it.") && st.resetAll()}>Erase all data</button>
       </section>
     </div>
   );

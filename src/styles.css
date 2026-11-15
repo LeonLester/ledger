@@ -172,3 +172,8 @@ table.t { width: 100%; border-collapse: collapse; font-size: .92rem; } table.t t
 .kbd-hide { position: absolute; left: -9999px; }
 @media (prefers-reduced-motion: reduce) { * { animation-duration: .001ms !important; transition-duration: .001ms !important; } }
 @media (max-width: 380px) { .set { grid-template-columns: 22px minmax(44px, .8fr) 1fr 1fr 1fr 44px; gap: 6px; } .disc { width: 42px; height: 42px; } }
+
+.pr { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: 2px 0 8px 50px; }
+.canvas-wrap { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #000; }
+.canvas-wrap canvas { width: 100%; height: auto; display: block; cursor: crosshair; touch-action: none; }
+input[type=range] { width: 100%; accent-color: var(--accent); min-height: 36px; }

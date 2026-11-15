@@ -6,6 +6,7 @@ import { Plan } from "./Plan";
 import { Volume } from "./Volume";
 import { Progress } from "./Progress";
 import { More } from "./More";
+import { Welcome } from "./Programs";
 import { canUpdate, checkUpdate } from "../native";
 
 const TABS = [
@@ -48,6 +49,7 @@ export function App() {
     if (settings.theme === "auto") r.removeAttribute("data-theme"); else r.setAttribute("data-theme", settings.theme);
   }, [settings.theme]);
   if (!ready) return <div className="main"><h1>Ledger</h1></div>;
+  if (!settings.onboarded) return <Welcome />;
   return (
     <div className="app">
       <nav className="nav" aria-label="Main">

@@ -17,14 +17,14 @@ export function Train() {
   const activeIds = new Set(sessions.filter((s) => s.status === "active").map((s) => s.id));
   const today = new Date().toLocaleDateString("en-US", { weekday: "long" });
   const todaySess = split.find((s) => s.day === today)?.session;
-  const todayName = planned.find((p) => p.name === todaySess || (todaySess === "Legs 1" && p.name === "Lower 1") || (todaySess === "Legs 2" && p.name === "Lower 2"))?.name;
+  const todayName = planned.find((p) => p.name === todaySess || (todaySess === "Legs 1" && p.name === "Lower 1") || (todaySess === "Legs 2" && p.name === "Lower 2") || (!!todaySess && p.name.startsWith(todaySess + " ")))?.name;
   const suggestions = feedback.filter((f) => f.state === "pending" && f.delta != null && f.delta !== 0);
   const emph = (n: string) => split.find((s) => s.session === n || (n.startsWith("Lower") && s.session === n.replace("Lower", "Legs")))?.emphasis;
 
   return (
     <div className="stack-lg">
       <div className="page-head">
-        <div><h1>{meso.name}</h1><p className="sub">Week {week} of {weeks.length}{week === weeks[weeks.length - 1] ? ", deload" : ""}</p></div>
+        <div><h1>{meso.name}</h1><p className="sub">Week {week} of {weeks.length}{meso.deload !== false && week === weeks[weeks.length - 1] ? ", deload" : ""}</p></div>
         <Seg value={settings.mode} onChange={(mode) => setSettings({ mode })} options={[{ v: "sheet", label: "Sheet" }, { v: "feedback", label: "Feedback" }, { v: "auto", label: "Auto" }]} label="Progression mode" />
       </div>
 

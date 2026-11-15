@@ -2,9 +2,10 @@ import { useMemo, useState } from "react";
 import { useStore } from "../store";
 import { bestE1rm, fmtW, topSet, workedSets } from "../lib/math";
 import { sessionDate, sortSessions } from "../lib/selectors";
-import { LineChart } from "./common";
+import { LineChart, Seg } from "./common";
+import { Records, Strength } from "./Strength";
 
-export function Progress() {
+function Trends() {
   const { sessions, bodyweight, addBodyweight, settings, split } = useStore();
   const [q, setQ] = useState("");
   const [bw, setBw] = useState("");
@@ -25,7 +26,7 @@ export function Progress() {
   const list = counts.filter(([n]) => n.toLowerCase().includes(q.toLowerCase()));
   return (
     <div className="stack-lg">
-      <div className="page-head"><div><h1>Progress</h1><p className="sub">Estimated 1RM by the Epley formula. Pin-stack lifts chart the pin position.</p></div></div>
+      <p className="sub">Estimated 1RM by the Epley formula. Pin-stack lifts chart the pin position.</p>
       <section className="stack">
         <input className="input" placeholder="Find a lift" aria-label="Find a lift" value={q} onChange={(e) => setQ(e.target.value)} />
         <div className="row wrap" style={{ gap: 6 }}>{list.slice(0, 14).map(([n, c]) => <button key={n} className={`pill ${n === sel ? "acc" : ""}`} onClick={() => setSel(n)} style={{ minHeight: 34, fontSize: ".85rem" }}>{n} <span className="faint">{c}</span></button>)}</div>
@@ -46,6 +47,16 @@ export function Progress() {
           <button className="btn primary" disabled={!Number(bw.replace(",", "."))} onClick={() => { addBodyweight(Number(bw.replace(",", "."))); setBw(""); }}>Log weight</button></div>
         {bodyweight.length ? <LineChart points={bodyweight.map((b, i) => ({ x: i, y: b.kg, label: b.date.slice(5) }))} unit="kg" height={140} color="var(--grn)" /> : <p className="dim small">No entries yet. Relative strength (e1RM per kg bodyweight) appears once you log a weight.</p>}
       </section>
+    </div>
+  );
+}
+
+export function Progress() {
+  const [view, setView] = useState<"trends" | "strength" | "records">("trends");
+  return (
+    <div className="stack-lg">
+      <div className="page-head"><div><h1>Progress</h1></div><Seg value={view} onChange={setView} label="View" options={[{ v: "trends", label: "Trends" }, { v: "strength", label: "Strength" }, { v: "records", label: "Records" }]} /></div>
+      {view === "trends" ? <Trends /> : view === "strength" ? <Strength /> : <Records />}
     </div>
   );
 }

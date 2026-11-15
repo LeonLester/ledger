@@ -26,3 +26,12 @@ Regenerate the seed from the workbook: `SRC="/path/Training Log Leo 2026.xlsx" n
 
 ## Cloudflare (phase 2)
 `wrangler.jsonc` deploys `dist/` as static assets. Next: D1 for sync (every row already has `athleteId`), Access or passkeys for auth, a Worker API, custom domain.
+
+## Programs, records and bar path
+
+- **Programs** (Plan, New program): 13 hypertrophy splits (full body 2 to 6 a week, upper/lower with any X and Y, PPL variants, PPLUL, Arnold, body part, torso/limbs, PHUL, anterior/posterior) and 6 powerlifting programs (StrongLifts 5x5, Starting Strength, GZCLP simplified, 5/3/1 BBB, Texas Method, 6 week RPE peaking block). Percent programs are built from the 1RMs you enter.
+- **Sample data**: first launch offers three real mesocycles to explore. More, Erase all data returns to that screen.
+- **Records**: every set is checked against all earlier sessions for a heaviest-weight PR, a rep PR at that weight, an e1RM PR, the best e1RM at the same bodyweight, and the best e1RM per kg bodyweight. Live while logging and again when you finish.
+- **Strength** (Progress): e1RM per lift, SBD total, DOTS, rep max table, weekly sets, tonnage, intensity, RPE and technique rating.
+- **Technique and bar path** (video icon on any exercise): rate technique, tag faults, or load a side-on video, mark the plate centre and edge (45 cm sets the scale) and the app tracks the bar on device. It reports range of motion, mean and peak concentric velocity, velocity loss and horizontal drift per rep, and stores the path with the set.
+- `npm test` checks the tracker, split and program generators and the PR engine.

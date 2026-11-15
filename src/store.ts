@@ -5,20 +5,36 @@ import type { Adjustment, BodyWeight, ExerciseDef, ExLog, Feedback, Meso, Seed, 
 import { defaultIncrement, isoDate, uid, worked } from "./lib/math";
 import { coarse, guessMuscle } from "./lib/muscles";
 import { effectiveSessions, feedbackDelta, mrvFor, suggestTarget, weekTarget } from "./lib/progression";
-import { lastLog } from "./lib/selectors";
+import { lastLog, mesoNum } from "./lib/selectors";
+import { CAT, LIFT_NAME } from "./data/catalog";
+import type { Generated } from "./data/templates";
 
 const seed = seedJson as unknown as Seed;
 const ATHLETE = "me";
 const DEFAULTS: Settings = {
   athleteId: ATHLETE, mode: "feedback", unit: "kg", bar: 20, plates: [25, 20, 15, 10, 5, 2.5, 1.25], restSec: 150,
-  theme: "auto", mesoStart: null, activeMeso: "m3", week: 1,
+  theme: "auto", mesoStart: null, activeMeso: "m3", week: 1, effort: "rir",
 };
+
+/** standard exercises are always available to add or swap in */
+function ensureCatalog(lib: Record<string, ExerciseDef>) {
+  const out = { ...lib };
+  const add = (name: string, base: string) => {
+    const c = CAT[base];
+    if (c && !out[name]) out[name] = { name, muscle: c.muscle, unit: c.unit ?? "kg", increment: c.inc ?? defaultIncrement("kg") };
+  };
+  for (const n of Object.keys(CAT)) add(n, n);
+  for (const n of Object.values(LIFT_NAME)) add(n + " (T2)", n);
+  return out;
+}
 
 interface State {
   ready: boolean; settings: Settings; mesos: Meso[]; sessions: Session[]; feedback: Feedback[]; adjustments: Adjustment[];
   bodyweight: BodyWeight[]; library: Record<string, ExerciseDef>; targets: Seed["targets"]; landmarks: Seed["landmarks"]; split: Seed["split"];
   openSession: string | null; update: import("./native").UpdateInfo | null; updateNote: string; rest: { until: number; total: number } | null; toast: string | null;
   init(): Promise<void>;
+  loadSample(): Promise<void>;
+  createProgram(build: (id: string) => Generated): Promise<void>;
   setSettings(p: Partial<Settings>): void;
   muscleOf(ex: string): string;
   startSession(week: number, name: string): string;
@@ -41,31 +57,64 @@ const persistSession = (s: Session) => void db.sessions.put(s);
 
 export const useStore = create<State>((set, get) => ({
   ready: false, settings: DEFAULTS, mesos: [], sessions: [], feedback: [], adjustments: [], bodyweight: [],
-  library: {}, targets: seed.targets, landmarks: seed.landmarks, split: seed.split, openSession: null, update: null, updateNote: "", rest: null, toast: null,
+  library: {}, targets: seed.targets, landmarks: seed.landmarks, split: [], openSession: null, update: null, updateNote: "", rest: null, toast: null,
 
   async init() {
     let st = await db.settings.get("main");
     if (!st) {
-      const sessions: Session[] = seed.sessions.map((s) => ({ ...s, athleteId: ATHLETE, status: "done" as const }));
-      const maxWeek = Math.max(...sessions.filter((s) => s.meso === DEFAULTS.activeMeso).map((s) => s.week));
-      await db.transaction("rw", [db.settings, db.mesos, db.sessions, db.kv], async () => {
-        await db.mesos.bulkPut(seed.mesos.map((m) => ({ ...m, athleteId: ATHLETE })));
-        await db.sessions.bulkPut(sessions);
-        const lib: Record<string, ExerciseDef> = {};
-        for (const [name, m] of Object.entries(seed.library)) {
-          const muscle = m === "Unknown" ? guessMuscle(name) : m;
-          lib[name] = { name, muscle, unit: "kg", increment: defaultIncrement("kg"), guessed: m === "Unknown" };
-        }
-        await db.kv.put({ key: "library", value: lib });
-        await db.settings.put({ ...DEFAULTS, week: maxWeek, key: "main" });
-      });
+      await db.settings.put({ ...DEFAULTS, onboarded: false, key: "main" });
       st = await db.settings.get("main");
+    } else if (st.onboarded === undefined) {
+      st = { ...st, onboarded: true };
+      await db.settings.put(st);
     }
-    const [mesos, sessions, feedback, adjustments, bodyweight, lib] = await Promise.all([
-      db.mesos.toArray(), db.sessions.toArray(), db.feedback.toArray(), db.adjustments.toArray(), db.bodyweight.toArray(), db.kv.get("library"),
+    const [mesos, sessions, feedback, adjustments, bodyweight, lib, sp] = await Promise.all([
+      db.mesos.toArray(), db.sessions.toArray(), db.feedback.toArray(), db.adjustments.toArray(), db.bodyweight.toArray(), db.kv.get("library"), db.kv.get("split"),
     ]);
     const { key: _k, ...settings } = st as Settings & { key: string };
-    set({ ready: true, settings, mesos, sessions, feedback, adjustments, bodyweight, library: (lib?.value as Record<string, ExerciseDef>) ?? {} });
+    const stored = (lib?.value as Record<string, ExerciseDef>) ?? {};
+    const library = ensureCatalog(stored);
+    if (Object.keys(library).length !== Object.keys(stored).length) void db.kv.put({ key: "library", value: library });
+    set({ ready: true, settings, mesos, sessions, feedback, adjustments, bodyweight, library, split: (sp?.value as Seed["split"]) ?? (settings.onboarded && mesos.length ? seed.split : []) });
+  },
+
+  /** Three real mesocycles of logged training, for exploring the app. */
+  async loadSample() {
+    const sessions: Session[] = seed.sessions.map((s) => ({ ...s, athleteId: ATHLETE, status: "done" as const }));
+    const maxWeek = Math.max(...sessions.filter((s) => s.meso === DEFAULTS.activeMeso).map((s) => s.week));
+    await db.transaction("rw", [db.settings, db.mesos, db.sessions, db.kv, db.feedback, db.adjustments, db.bodyweight], async () => {
+      await Promise.all([db.mesos.clear(), db.sessions.clear(), db.feedback.clear(), db.adjustments.clear(), db.bodyweight.clear()]);
+      await db.mesos.bulkPut(seed.mesos.map((m) => ({ ...m, athleteId: ATHLETE })));
+      await db.sessions.bulkPut(sessions);
+      const lib: Record<string, ExerciseDef> = {};
+      for (const [name, m] of Object.entries(seed.library)) {
+        const muscle = m === "Unknown" ? guessMuscle(name) : m;
+        lib[name] = { name, muscle, unit: "kg", increment: defaultIncrement("kg"), guessed: m === "Unknown" };
+      }
+      await db.kv.put({ key: "library", value: lib });
+      await db.kv.put({ key: "split", value: seed.split });
+      await db.settings.put({ ...DEFAULTS, week: maxWeek, onboarded: true, key: "main" });
+    });
+    await get().init();
+  },
+
+  async createProgram(build) {
+    const { mesos, library, settings } = get();
+    const id = `m${Math.max(0, ...mesos.map((m) => mesoNum(m.id))) + 1}`;
+    const g = build(id);
+    const lib = { ...library };
+    for (const w of g.meso.weeks) for (const sess of w.sessions) for (const it of sess.items) {
+      if (lib[it.exercise]) continue;
+      const base = CAT[it.exercise.replace(/ \(T2\)$/, "")];
+      lib[it.exercise] = { name: it.exercise, muscle: base?.muscle ?? guessMuscle(it.exercise), unit: "kg", increment: base?.inc ?? defaultIncrement("kg") };
+    }
+    const row = { ...g.meso, athleteId: settings.athleteId };
+    const next: Settings = { ...settings, activeMeso: id, week: 1, onboarded: true, mode: g.mode ?? settings.mode, effort: g.effort ?? settings.effort, tms: g.tms ?? settings.tms };
+    await db.mesos.put(row);
+    await db.kv.put({ key: "library", value: lib });
+    await db.kv.put({ key: "split", value: g.split });
+    await db.settings.put({ ...next, key: "main" });
+    set({ mesos: [...mesos, row], library: lib, split: g.split, settings: next, openSession: null });
   },
 
   setSettings(p) {
@@ -82,12 +131,20 @@ export const useStore = create<State>((set, get) => ({
     const meso = mesos.find((m) => m.id === settings.activeMeso)!;
     const planned = meso.weeks.find((w) => w.week === week)?.sessions.find((s) => s.name === name);
     const effective = effectiveSessions(meso, week, get().adjustments, get().muscleOf).find((s) => s.name === name);
+    const tms = settings.tms ?? {};
     const exercises: ExLog[] = (effective?.items ?? planned?.items ?? []).map((it) => {
-      const tgt = suggestTarget(it, lastLog(it.exercise, sessions), library[it.exercise]);
-      return {
-        letter: it.letter, exercise: it.exercise, unit: library[it.exercise]?.unit ?? "kg", rir: it.rir, note: null,
-        sets: Array.from({ length: Math.max(1, it.sets) }, () => ({ weight: tgt.weight, reps: null, myo: [] })),
-      };
+      const def = library[it.exercise];
+      const tm = it.lift ? tms[it.lift] : undefined;
+      const wFor = (pct: number) => (tm ? Math.round((tm * pct) / 2.5) * 2.5 : null);
+      let sets: SetLog[];
+      if (it.scheme) {
+        sets = it.scheme.map((sc) => ({ weight: wFor(sc.pct), reps: null, myo: [], tr: sc.reps, amrap: !!sc.amrap }));
+      } else {
+        const tgt = suggestTarget(it, lastLog(it.exercise, sessions), def);
+        const w = it.pct != null && tm ? wFor(it.pct) : tgt.weight;
+        sets = Array.from({ length: Math.max(1, it.sets) }, () => ({ weight: w, reps: null, myo: [] }));
+      }
+      return { letter: it.letter, exercise: it.exercise, unit: def?.unit ?? "kg", rir: it.rir, note: null, sets };
     });
     const s: Session = { id, athleteId: settings.athleteId, meso: settings.activeMeso, week, name, date: isoDate(new Date()), status: "active", exercises, started: Date.now() };
     set({ sessions: [...sessions, s], openSession: id });
@@ -221,7 +278,7 @@ export const useStore = create<State>((set, get) => ({
     await db.adjustments.bulkPut(d.adjustments ?? []); await db.bodyweight.bulkPut(d.bodyweight ?? []); await db.kv.put({ key: "library", value: d.library });
     await get().init();
   },
-  async resetAll() { await db.delete(); await db.open(); await get().init(); },
+  async resetAll() { await db.delete(); await db.open(); set({ sessions: [], mesos: [], feedback: [], adjustments: [], bodyweight: [] }); await get().init(); },
 }));
 
 export type { SetLog, Unit };

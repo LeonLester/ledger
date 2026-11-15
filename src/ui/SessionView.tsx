@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Disc3, Flame, Plus, Minus, Repeat, StickyNote, Trash2 } from "lucide-react";
+import { ArrowLeft, Disc3, Flame, Plus, Minus, Repeat, StickyNote, Trash2, Video } from "lucide-react";
+import { PR_LABEL, sessionPrs } from "../lib/pr";
+import { TechSheet } from "./Technique";
 import { useStore } from "../store";
 import { bestE1rm, defaultIncrement, fmtW, PLATE_COLORS, plateLoad, warmups, workedSets } from "../lib/math";
 import { effectiveSessions, feedbackDelta, pumpLabels, sorenessLabels, suggestTarget, workloadLabels } from "../lib/progression";
@@ -14,16 +16,27 @@ function RepsCell({ s, placeholder, onChange }: { s: SetLog; placeholder: string
     onChange={(e) => { setT(e.target.value); const p = parseReps(e.target.value); if (p) onChange(p); }} />;
 }
 
+function EffCell({ rir, rpe, placeholder, label, onChange }: { rir: number | null | undefined; rpe: boolean; placeholder: string; label: string; onChange: (v: number | null) => void }) {
+  const show = rir == null ? "" : String(rpe ? 10 - rir : rir);
+  const parse = (t: string) => (t === "" ? null : rpe ? 10 - Number(t) : Number(t));
+  const [t, setT] = useState(show);
+  useEffect(() => { if (parse(t) !== (rir ?? null)) setT(show); /* eslint-disable-next-line */ }, [rir, rpe]);
+  return <input className="cell" inputMode="decimal" aria-label={label} placeholder={placeholder} value={t}
+    onChange={(e) => { const v = e.target.value.replace(",", "."); setT(v); if (v === "" || (/^\d+(\.\d?)?$/.test(v) && !v.endsWith("."))) onChange(parse(v)); }} />;
+}
+
 export function SessionView({ id }: { id: string }) {
   const st = useStore();
-  const { sessions, settings, mesos, adjustments, library, feedback, muscleOf, closeSession, updateEx, toggleSet } = st;
+  const { sessions, settings, mesos, adjustments, library, feedback, muscleOf, closeSession, updateEx, toggleSet, bodyweight, split } = st;
   const sess = sessions.find((s) => s.id === id);
-  const [menu, setMenu] = useState<{ i: number; kind: "warm" | "plates" | "note" | "swap" } | null>(null);
+  const [menu, setMenu] = useState<{ i: number; kind: "warm" | "plates" | "note" | "swap" | "tech" } | null>(null);
   const [finishing, setFinishing] = useState(false);
   const [adding, setAdding] = useState(false);
   const meso = mesos.find((m) => m.id === sess?.meso);
   const plan = useMemo(() => (meso && sess ? effectiveSessions(meso, sess.week, adjustments, muscleOf).find((p) => p.name === sess.name) : undefined), [meso, sess?.week, sess?.name, adjustments]);
+  const prs = useMemo(() => (sess ? sessionPrs(sess, sessions, bodyweight, { mesoStart: settings.mesoStart, split }, sess.status === "active") : []), [sess, sessions, bodyweight]);
   if (!sess) return null;
+  const rpeMode = settings.effort === "rpe";
   const muscles = [...new Set(sess.exercises.map((e) => muscleOf(e.exercise)))];
   const needSoreness = settings.mode === "sheet" ? [] : feedback.filter((f) => f.soreness == null && muscles.includes(f.muscle) && f.sessionId !== sess.id);
   const total = sess.exercises.reduce((a, e) => a + e.sets.length, 0);
@@ -53,7 +66,7 @@ export function SessionView({ id }: { id: string }) {
       )}
 
       {sess.exercises.map((ex, i) => {
-        const item = plan?.items.find((p) => p.exercise === ex.exercise) ?? plan?.items[i];
+        const item = plan?.items.find((p) => p.letter === ex.letter && p.exercise === ex.exercise) ?? plan?.items.find((p) => p.exercise === ex.exercise) ?? plan?.items[i];
         const last = lastLog(ex.exercise, sessions, sess);
         const def = library[ex.exercise];
         const tgt = item ? suggestTarget(item, last, def) : null;
@@ -74,16 +87,18 @@ export function SessionView({ id }: { id: string }) {
                 <button className="btn ghost icon sm" aria-label="Plate calculator" onClick={() => setMenu({ i, kind: "plates" })}><Disc3 size={18} /></button>
                 <button className="btn ghost icon sm" aria-label="Swap exercise" onClick={() => setMenu({ i, kind: "swap" })}><Repeat size={18} /></button>
                 <button className="btn ghost icon sm" aria-label="Note" onClick={() => setMenu({ i, kind: "note" })}><StickyNote size={18} color={ex.note ? "var(--accent)" : undefined} /></button>
+                <button className="btn ghost icon sm" aria-label="Technique and bar path" onClick={() => setMenu({ i, kind: "tech" })}><Video size={18} color={ex.tech || ex.paths?.length ? "var(--accent)" : undefined} /></button>
               </div>
             </div>
-            {tgt && (
+            {item?.desc && <div className="target"><span>Prescribed <b>{item.desc}</b></span></div>}
+            {tgt && !item?.scheme && !(item?.pct != null && item.lift && settings.tms?.[item.lift]) && (
               <div className="target">
                 {tgt.weight != null ? <span>Aim <b className="num">{fmtW(tgt.weight)} {unit}</b> for <b>{item?.repLo}{item && item.repHi !== item.repLo ? `-${item.repHi}` : ""}</b> reps</span> : <span>Aim for <b>{item?.repLo}{item && item.repHi !== item.repLo ? `-${item.repHi}` : ""}</b> reps</span>}
                 <span className="faint">{tgt.note}</span>
               </div>
             )}
             <div className="sets">
-              <div className="set head"><span /><span>Last</span><span style={{ textAlign: "center" }}>{unit}</span><span style={{ textAlign: "center" }}>Reps</span><span style={{ textAlign: "center" }}>RIR</span><span /></div>
+              <div className="set head"><span /><span>Last</span><span style={{ textAlign: "center" }}>{unit}</span><span style={{ textAlign: "center" }}>Reps</span><span style={{ textAlign: "center" }}>{rpeMode ? "RPE" : "RIR"}</span><span /></div>
               {ex.sets.map((s, j) => {
                 const p = prevSets[j] ?? prevSets[prevSets.length - 1];
                 const rirClass = s.rir == null ? "" : s.rir <= 0 ? "rir-1" : s.rir === 1 ? "rir-2" : s.rir === 2 ? "rir-3" : "rir-4";
@@ -93,9 +108,8 @@ export function SessionView({ id }: { id: string }) {
                     <span className="prev num">{p && p.reps != null ? `${fmtW(p.weight) || "-"}x${repsText(p)}` : "-"}</span>
                     <input className="cell" inputMode="decimal" aria-label={`Set ${j + 1} weight`} value={s.weight ?? ""} placeholder={fmtW(p?.weight ?? null) || "0"}
                       onChange={(e) => patchSet(i, j, { weight: e.target.value === "" ? null : Number(e.target.value.replace(",", ".")) })} />
-                    <RepsCell s={s} placeholder={item?.repLo ? String(item.repLo) : "0"} onChange={(v) => patchSet(i, j, v)} />
-                    <input className="cell" inputMode="numeric" aria-label={`Set ${j + 1} reps in reserve`} value={s.rir ?? ""} placeholder={ex.rir != null ? String(ex.rir) : "-"}
-                      onChange={(e) => patchSet(i, j, { rir: e.target.value === "" ? null : Number(e.target.value) })} />
+                    <RepsCell s={s} placeholder={s.tr ? `${s.tr}${s.amrap ? "+" : ""}` : item?.repLo ? String(item.repLo) : "0"} onChange={(v) => patchSet(i, j, v)} />
+                    <EffCell rir={s.rir} rpe={rpeMode} label={`Set ${j + 1} ${rpeMode ? "RPE" : "reps in reserve"}`} placeholder={ex.rir != null ? String(rpeMode ? 10 - ex.rir : ex.rir) : "-"} onChange={(v) => patchSet(i, j, { rir: v })} />
                     <button className={`disc ${rirClass}`} aria-pressed={!!s.done} aria-label={`Set ${j + 1} done`} onClick={() => toggleSet(id, i, j)}>
                       {s.done ? <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg> : null}
                     </button>
@@ -103,6 +117,7 @@ export function SessionView({ id }: { id: string }) {
                 );
               })}
             </div>
+            {prs.filter((p) => p.ex === i).map((p) => <div key={p.kind} className="pr"><span className="pill ok">{PR_LABEL[p.kind]}</span><span className="small">Set {p.set + 1}: {p.text}</span></div>)}
             <div className="addset">
               <button className="btn sm ghost" onClick={() => updateEx(id, i, (e) => ({ ...e, sets: [...e.sets, { weight: e.sets[e.sets.length - 1]?.weight ?? null, reps: null, myo: [] }] }))}><Plus size={16} /> Add set</button>
               {ex.sets.length > 1 && <button className="btn sm ghost" onClick={() => updateEx(id, i, (e) => ({ ...e, sets: e.sets.slice(0, -1) }))}><Minus size={16} /> Remove set</button>}
@@ -128,6 +143,7 @@ export function SessionView({ id }: { id: string }) {
                 <button className="btn primary" onClick={() => setMenu(null)}>Save note</button>
               </Sheet>
             )}
+            {menu?.i === i && menu.kind === "tech" && <TechSheet id={id} i={i} onClose={() => setMenu(null)} />}
             {menu?.i === i && menu.kind === "swap" && (
               <Sheet title={`Swap ${ex.exercise}`} onClose={() => setMenu(null)}>
                 <p className="dim small">Same muscle ({muscleOf(ex.exercise)}). Loads reset to the new lift's history.</p>
@@ -186,15 +202,11 @@ function FinishSheet({ id, onClose }: { id: string; onClose: () => void }) {
   const sess = sessions.find((s) => s.id === id)!;
   const muscles = [...new Set(sess.exercises.filter((e) => e.sets.some((s) => s.done || (s.reps ?? 0) > 0)).map((e) => muscleOf(e.exercise)))];
   const [fb, setFb] = useState<Record<string, { pump: number; workload: number }>>(Object.fromEntries(muscles.map((m) => [m, { pump: 1, workload: 1 }])));
-  const prs = sess.exercises.map((e) => {
-    const cur = bestE1rm({ ...e, sets: e.sets.filter((s) => s.done || (s.reps ?? 0) > 0) });
-    const prev = sortSessions(sessions.filter((s) => s.id !== id && s.status === "done")).flatMap((s) => s.exercises.filter((x) => x.exercise === e.exercise)).map(bestE1rm).filter((v): v is number => v != null);
-    const best = prev.length ? Math.max(...prev) : null;
-    return cur && best && cur > best + 0.4 ? { name: e.exercise, cur, best } : null;
-  }).filter(Boolean) as { name: string; cur: number; best: number }[];
+  const { bodyweight, settings, split } = useStore();
+  const prs = sessionPrs(sess, sessions, bodyweight, { mesoStart: settings.mesoStart, split }, false);
   return (
     <Sheet title="Finish session" onClose={onClose}>
-      {prs.length > 0 && <div className="stack"><h3>New estimated 1RM</h3>{prs.map((p) => <div key={p.name} className="row between"><b>{p.name}</b><span className="pill ok num">{p.cur.toFixed(1)} kg, was {p.best.toFixed(1)}</span></div>)}</div>}
+      {prs.length > 0 && <div className="stack"><h3>Records this session</h3>{prs.map((p) => <div key={p.exercise + p.kind} className="row between wrap"><span><b>{p.exercise}</b><div className="faint xs">Set {p.set + 1}: {p.text}</div></span><span className="pill ok">{PR_LABEL[p.kind]}</span></div>)}</div>}
       <p className="dim small">Rate each muscle you trained. Soreness is asked next time you train it, then the app suggests set changes.</p>
       {muscles.map((m) => (
         <div className="fb-row" key={m}>
@@ -209,5 +221,5 @@ function FinishSheet({ id, onClose }: { id: string; onClose: () => void }) {
     </Sheet>
   );
 }
-void feedbackDelta; void workedSets; void sorenessLabels;
+void feedbackDelta; void workedSets; void sorenessLabels; void bestE1rm; void sortSessions;
 export type { ExLog };

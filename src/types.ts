@@ -1,13 +1,21 @@
 export type Unit = "kg" | "lb" | "pin";
 export type Mode = "sheet" | "feedback" | "auto";
 
-export interface PlanItem { letter: string; exercise: string; sets: number; repLo: number | null; repHi: number | null; rir: number | null }
+export type LiftKey = "squat" | "bench" | "deadlift" | "ohp";
+export interface SetScheme { pct: number; reps: number; amrap?: boolean }
+export interface PlanItem {
+  letter: string; exercise: string; sets: number; repLo: number | null; repHi: number | null; rir: number | null;
+  /** powerlifting: lift whose training max the percentages refer to */
+  lift?: LiftKey; pct?: number; scheme?: SetScheme[]; desc?: string;
+}
 export interface PlanSession { name: string; items: PlanItem[] }
 export interface PlanWeek { week: number; sessions: PlanSession[] }
-export interface Meso { id: string; name: string; weeks: PlanWeek[] }
+export interface Meso { id: string; name: string; weeks: PlanWeek[]; deload?: boolean }
 
-export interface SetLog { weight: number | null; reps: number | null; myo: number[]; rir?: number | null; done?: boolean }
-export interface ExLog { letter: string; exercise: string; unit: Unit | null; rir: number | null; sets: SetLog[]; note: string | null }
+export interface SetLog { weight: number | null; reps: number | null; myo: number[]; rir?: number | null; done?: boolean; tr?: number | null; amrap?: boolean }
+export interface RepMetric { rom: number; mcv: number; pv: number; dev: number; tUp: number }
+export interface BarPathRec { set: number; at: number; fps: number; pts: [number, number][]; reps: RepMetric[] }
+export interface ExLog { letter: string; exercise: string; unit: Unit | null; rir: number | null; sets: SetLog[]; note: string | null; tech?: number | null; form?: string[]; paths?: BarPathRec[] }
 export interface Muscle3 { pump: number; workload: number }
 export interface Session {
   id: string; athleteId: string; meso: string; week: number; name: string;
@@ -25,6 +33,7 @@ export interface ExerciseDef { name: string; muscle: string; unit: Unit; increme
 export interface Settings {
   athleteId: string; mode: Mode; unit: Unit; bar: number; plates: number[]; restSec: number;
   theme: "auto" | "dark" | "light"; mesoStart: string | null; activeMeso: string; week: number;
+  onboarded?: boolean; effort?: "rir" | "rpe"; sex?: "m" | "f"; tms?: Partial<Record<LiftKey, number>>; liftMap?: Partial<Record<LiftKey, string>>;
 }
 export interface Seed {
   mesos: Meso[]; sessions: Omit<Session, "athleteId" | "status">[]; library: Record<string, string>;

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { ProgramPicker } from "./Programs";
 import { useStore } from "../store";
 import { effectiveSessions, pumpLabels } from "../lib/progression";
 import { Seg } from "./common";
@@ -7,13 +8,17 @@ export function Plan() {
   const { mesos, settings, adjustments, muscleOf, setSettings, feedback, split } = useStore();
   const [mesoId, setMesoId] = useState(settings.activeMeso);
   const [week, setWeek] = useState(settings.week);
-  const meso = mesos.find((m) => m.id === mesoId)!;
+  const [picking, setPicking] = useState(false);
+  useEffect(() => { setMesoId(settings.activeMeso); setWeek(settings.week); }, [settings.activeMeso]);
+  const meso = mesos.find((m) => m.id === mesoId) ?? mesos[0];
+  if (picking) return <div className="stack-lg"><div className="page-head"><div><h1>New program</h1><p className="sub">It becomes your active block. Earlier blocks and logs stay.</p></div><button className="btn ghost" onClick={() => setPicking(false)}>Cancel</button></div><ProgramPicker onDone={() => setPicking(false)} /></div>;
+  if (!meso) return null;
   const base = meso.weeks.find((w) => w.week === week);
   const eff = effectiveSessions(meso, week, adjustments, muscleOf);
   const ledger = adjustments.filter((a) => a.meso === mesoId).sort((a, b) => a.week - b.week);
   return (
     <div className="stack-lg">
-      <div className="page-head"><div><h1>Plan</h1><p className="sub">Your sheet's mesocycles, with feedback changes layered on top.</p></div></div>
+      <div className="page-head"><div><h1>Plan</h1><p className="sub">Your mesocycles, with feedback changes layered on top.</p></div><button className="btn" onClick={() => setPicking(true)}>New program</button></div>
       <div className="row wrap">
         <Seg value={mesoId} onChange={(v) => { setMesoId(v); setWeek(1); }} options={mesos.map((m) => ({ v: m.id, label: m.name }))} label="Mesocycle" />
         <Seg value={week} onChange={setWeek} options={meso.weeks.map((w) => ({ v: w.week, label: `W${w.week}` }))} label="Week" />
@@ -30,7 +35,7 @@ export function Plan() {
               {s.items.map((i, k) => {
                 const b = base?.sessions.find((x) => x.name === s.name)?.items[k];
                 const delta = b ? i.sets - b.sets : 0;
-                return <tr key={i.letter + i.exercise}><td><b>{i.letter}</b> {i.exercise}<div className="faint xs">{muscleOf(i.exercise)}</div></td>
+                return <tr key={i.letter + i.exercise}><td><b>{i.letter}</b> {i.exercise}<div className="faint xs">{i.desc ?? muscleOf(i.exercise)}</div></td>
                   <td className="num">{i.sets}{delta !== 0 && <span className={`pill ${delta > 0 ? "ok" : "warn"}`} style={{ marginLeft: 6 }}>{delta > 0 ? "+" : ""}{delta}</span>}</td>
                   <td className="num">{i.repLo ?? "-"}{i.repHi && i.repHi !== i.repLo ? `-${i.repHi}` : ""}</td><td className="num">{i.rir ?? "-"}</td></tr>;
               })}
