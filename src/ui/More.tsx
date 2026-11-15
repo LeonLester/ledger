@@ -137,10 +137,10 @@ export function More() {
         <div className="list">{Object.values(library).filter((d) => d.name.toLowerCase().includes(q.toLowerCase())).sort((a, b) => (a.guessed === b.guessed ? a.name.localeCompare(b.name) : a.guessed ? -1 : 1)).slice(0, 40).map((d) => (
           <div key={d.name} className="row between wrap" style={{ padding: "10px 0" }}>
             <div><b>{d.name}</b>{d.guessed && <span className="pill warn" style={{ marginLeft: 8 }}>Guessed</span>}</div>
-            <div className="row">
-              <select className="input" style={{ width: 170 }} aria-label={`${d.name} muscle`} value={d.muscle} onChange={(e) => st.setExercise(d.name, { muscle: e.target.value })}>{[...new Set([...muscles, "Unknown"])].map((m) => <option key={m}>{m}</option>)}</select>
-              <select className="input" style={{ width: 84 }} aria-label={`${d.name} unit`} value={d.unit} onChange={(e) => st.setExercise(d.name, { unit: e.target.value as "kg" | "lb" | "pin" })}><option value="kg">kg</option><option value="lb">lb</option><option value="pin">pin</option></select>
-              <input className="input num" style={{ width: 70 }} inputMode="decimal" aria-label={`${d.name} load step`} defaultValue={d.increment} onBlur={(e) => st.setExercise(d.name, { increment: Number(e.target.value) || d.increment })} />
+            <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 84px 72px", gap: 8, width: "100%" }}>
+              <select className="input" style={{ width: "100%" }} aria-label={`${d.name} muscle`} value={d.muscle} onChange={(e) => st.setExercise(d.name, { muscle: e.target.value })}>{[...new Set([...muscles, "Unknown"])].map((m) => <option key={m}>{m}</option>)}</select>
+              <select className="input" style={{ width: "100%" }} aria-label={`${d.name} unit`} value={d.unit} onChange={(e) => st.setExercise(d.name, { unit: e.target.value as "kg" | "lb" | "pin" })}><option value="kg">kg</option><option value="lb">lb</option><option value="pin">pin</option></select>
+              <input className="input num" style={{ width: "100%" }} inputMode="decimal" aria-label={`${d.name} load step`} defaultValue={d.increment} onBlur={(e) => st.setExercise(d.name, { increment: Number(e.target.value) || d.increment })} />
             </div>
           </div>))}</div>
         <p className="faint xs">Load step is how much the app adds once you hit the top of the rep range.</p>
