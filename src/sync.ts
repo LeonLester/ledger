@@ -1,5 +1,8 @@
 import { create } from "zustand";
 import { api, ApiError, loadAuth, saveAuth, setToken, type Account } from "./api";
+import { Browser } from "@capacitor/browser";
+import { App as CapApp } from "@capacitor/app";
+import { HOME, isNative } from "./native";
 import { db, KINDS, LedgerDB, onRowChange, openDb, type SyncKind } from "./db";
 
 /** Offline-first sync. Rows are written locally, queued in an outbox and pushed when online. Last write wins per row. */
@@ -152,3 +155,39 @@ export async function joinCoach(code: string) {
 
 for (const ev of ["online", "focus"] as const) window.addEventListener(ev, () => void syncNow());
 setInterval(() => { if (document.visibilityState === "visible") void syncNow(); }, 60_000);
+
+
+/* ---- Sign in with Google ---- */
+const GV = "ledger.gv";
+const b64u = (u: Uint8Array) => btoa(String.fromCharCode(...u)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+export const googleEnabled = () => api<{ google: boolean }>("/api/config").then((c) => c.google).catch(() => false);
+
+/** Opens Google in the browser (a Custom Tab in the app). A random verifier stays on this device; only its hash goes to the server. */
+export async function googleStart(coachCode?: string) {
+  const verifier = b64u(crypto.getRandomValues(new Uint8Array(48)));
+  try { localStorage.setItem(GV, verifier); } catch { throw new Error("Storage is blocked, so Google sign-in cannot work."); }
+  const challenge = b64u(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier))));
+  const q = new URLSearchParams({ c: challenge, ...(isNative ? { app: "1" } : {}), ...(coachCode ? { code: coachCode } : {}) });
+  const url = `${HOME}/api/google/start?${q}`;
+  if (isNative) await Browser.open({ url }); else location.href = url;
+}
+
+/** Trades the one-time code from the redirect for a session. */
+export async function googleFinish(code: string) {
+  let v = "";
+  try { v = localStorage.getItem(GV) ?? ""; localStorage.removeItem(GV); } catch { /* storage blocked */ }
+  const r = await api<{ token: string; user: Account }>("/api/google/exchange", { code, v });
+  setToken(r.token); saveAuth(r);
+  await enterAccount(r.user);
+}
+
+/** Picks up the return from Google: a #gcode on the web, a deep link in the app. Returns true when it handled one. */
+export function watchGoogleReturn(onError: (m: string) => void) {
+  const run = (code: string) => { try { void Browser.close(); } catch { /* not open */ } googleFinish(code).catch((e) => onError((e as Error).message)); };
+  const m = /gcode=([\w-]+)/.exec(location.hash);
+  if (m) { history.replaceState(null, "", location.pathname); run(m[1]); return true; }
+  const why = new URLSearchParams(location.search).get("signin");
+  if (why) { history.replaceState(null, "", location.pathname); onError(why === "cancelled" ? "Google sign-in was cancelled." : "Google sign-in did not finish. Try again."); }
+  if (isNative) void CapApp.addListener("appUrlOpen", (e) => { const c = /[?&]code=([\w-]+)/.exec(e.url); if (e.url.includes("://signin") && c) run(c[1]); });
+  return false;
+}

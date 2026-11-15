@@ -5,5 +5,6 @@
   "compatibility_date": "2026-11-01",
   "assets": { "directory": "./dist", "not_found_handling": "single-page-application", "run_worker_first": ["/api/*"] },
   "d1_databases": [{ "binding": "DB", "database_name": "ledger", "database_id": "ded315e4-d370-45b5-8ba9-27c2453a7463" }],
+  "vars": { "PUBLIC_ORIGIN": "https://ledger.coachleonidas.com", "GOOGLE_CLIENT_ID": "354815097557-3sef5saof4h49p1dbif4kpkdjfiom774.apps.googleusercontent.com" },
   "routes": [{ "pattern": "ledger.coachleonidas.com", "custom_domain": true }]
 }

@@ -7,9 +7,27 @@ const unb64 = (s: string) => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/
 const rand = (n: number) => crypto.getRandomValues(new Uint8Array(n));
 const id = () => b64(rand(12));
 
-const CORS = { "access-control-allow-origin": "*", "access-control-allow-headers": "authorization,content-type", "access-control-allow-methods": "GET,POST,DELETE,OPTIONS", "access-control-max-age": "86400" };
-const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json", "cache-control": "no-store", ...CORS } });
+/** Browsers on these origins may call the API: the site itself and the Android app's WebView. Everything else gets no CORS headers. */
+const ORIGINS = ["https://ledger.coachleonidas.com", "https://localhost", "capacitor://localhost"];
+const json = (data: unknown, status = 200, extra: Record<string, string> = {}) => new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json", "cache-control": "no-store", ...extra } });
+function harden(req: Request, res: Response, env: Env): Response {
+  const out = new Response(res.body, res);
+  const o = req.headers.get("origin");
+  out.headers.append("vary", "Origin");
+  if (o && (ORIGINS.includes(o) || o === env.PUBLIC_ORIGIN)) {
+    out.headers.set("access-control-allow-origin", o);
+    out.headers.set("access-control-allow-headers", "authorization,content-type");
+    out.headers.set("access-control-allow-methods", "GET,POST,DELETE,OPTIONS");
+    out.headers.set("access-control-max-age", "86400");
+  }
+  out.headers.set("x-content-type-options", "nosniff");
+  out.headers.set("referrer-policy", "no-referrer");
+  out.headers.set("strict-transport-security", "max-age=31536000");
+  out.headers.set("cross-origin-opener-policy", "same-origin");
+  return out;
+}
 const fail = (status: number, error: string) => json({ error }, status);
+const tooMany = (sec: number) => json({ error: "Too many attempts. Wait a few minutes and try again." }, 429, { "retry-after": String(sec) });
 
 async function sha(s: string) { return b64(new Uint8Array(await crypto.subtle.digest("SHA-256", enc.encode(s)))); }
 async function hashPw(pw: string, salt: Uint8Array) {
@@ -27,9 +45,23 @@ const SCHEMA = [
   "CREATE INDEX IF NOT EXISTS asg_client ON assignments (client_id)",
   "CREATE TABLE IF NOT EXISTS comments (id TEXT PRIMARY KEY, coach_id TEXT NOT NULL, client_id TEXT NOT NULL, session_id TEXT, body TEXT NOT NULL, created INTEGER NOT NULL)",
   "CREATE INDEX IF NOT EXISTS cmt_client ON comments (client_id, created)",
+  "CREATE TABLE IF NOT EXISTS rl (k TEXT NOT NULL, w INTEGER NOT NULL, n INTEGER NOT NULL, exp INTEGER NOT NULL, PRIMARY KEY (k, w))",
 ];
 let ready: Promise<unknown> | null = null;
-const ensure = (db: D1Database) => (ready ??= db.batch(SCHEMA.map((q) => db.prepare(q))).catch((e) => { ready = null; throw e; }));
+const ensure = (db: D1Database) => (ready ??= (async () => {
+  await db.batch(SCHEMA.map((q) => db.prepare(q)));
+  try { await db.prepare("ALTER TABLE users ADD COLUMN google_sub TEXT").run(); } catch { /* column exists */ }
+  await db.prepare("CREATE UNIQUE INDEX IF NOT EXISTS users_gsub ON users (google_sub)").run();
+})().catch((e) => { ready = null; throw e; }));
+
+/** Fixed-window rate limit kept in D1. True when the caller is over the limit. */
+async function limited(db: D1Database, key: string, limit: number, windowSec: number) {
+  const now = Date.now(), win = Math.floor(now / (windowSec * 1000));
+  const row = await db.prepare("INSERT INTO rl (k, w, n, exp) VALUES (?, ?, 1, ?) ON CONFLICT(k, w) DO UPDATE SET n = n + 1 RETURNING n").bind(key, win, (win + 1) * windowSec * 1000).first<{ n: number }>();
+  if (Math.random() < 0.02) await db.prepare("DELETE FROM rl WHERE exp < ?").bind(now).run();
+  return !!row && row.n > limit;
+}
+const ipOf = (req: Request) => req.headers.get("cf-connecting-ip") ?? "";
 
 interface User { id: string; email: string; name: string; role: "athlete" | "coach"; coach_id: string | null; invite: string | null }
 const pub = (u: User, coachName?: string | null) => ({ id: u.id, email: u.email, name: u.name, role: u.role, coachId: u.coach_id, coachName: coachName ?? null, invite: u.role === "coach" ? u.invite : null });
@@ -55,16 +87,22 @@ const MAX_DOC = 900_000;
 async function handle(req: Request, env: Env): Promise<Response> {
   const url = new URL(req.url);
   const path = url.pathname;
-  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
+  if (req.method === "OPTIONS") return new Response(null, { status: 204 });
   const db = env.DB;
   await ensure(db);
+  const ip = ipOf(req); // empty on local dev, where address limits are skipped
+  if (ip && (await limited(db, `api:${ip}`, 300, 60))) return tooMany(60);
   const body = async <T,>() => (await req.json().catch(() => ({}))) as T;
 
+  if (path === "/api/config") return json({ google: !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET) });
+
   if (path === "/api/signup" && req.method === "POST") {
+    if (ip && (await limited(db, `signup:${ip}`, 10, 3600))) return tooMany(3600);
     const b = await body<{ email: string; password: string; name: string; code?: string; coachKey?: string }>();
     const email = clean(b.email, 200).toLowerCase(), name = clean(b.name, 80);
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return fail(400, "Enter a valid email address.");
-    if (!b.password || b.password.length < 8) return fail(400, "Use a password of at least 8 characters.");
+    if (typeof b.password !== "string" || b.password.length < 8) return fail(400, "Use a password of at least 8 characters.");
+    if (b.password.length > 200) return fail(400, "That password is too long.");
     if (!name) return fail(400, "Enter your name.");
     let role: "athlete" | "coach" = "athlete", coach: string | null = null;
     if (b.coachKey) {
@@ -85,10 +123,87 @@ async function handle(req: Request, env: Env): Promise<Response> {
 
   if (path === "/api/login" && req.method === "POST") {
     const b = await body<{ email: string; password: string }>();
-    const row = await db.prepare("SELECT * FROM users WHERE email = ?").bind(clean(b.email, 200).toLowerCase()).first<User & { salt: string; hash: string }>();
-    const ok = row && safeEq(await hashPw(String(b.password ?? ""), unb64(row.salt)), row.hash);
+    const em = clean(b.email, 200).toLowerCase();
+    if ((ip && (await limited(db, `login:${ip}`, 20, 900))) || (await limited(db, `loginE:${em}`, 10, 900))) return tooMany(900);
+    const row = await db.prepare("SELECT * FROM users WHERE email = ?").bind(em).first<User & { salt: string; hash: string }>();
+    if (row && !row.hash) return fail(401, "This account signs in with Google. Use the Continue with Google button.");
+    const ok = row && String(b.password ?? "").length <= 200 && safeEq(await hashPw(String(b.password ?? ""), unb64(row.salt)), row.hash);
     if (!row || !ok) return fail(401, "Email or password is not right.");
     return json({ token: await newToken(db, row.id), user: pub(row, await coachName(db, row.coach_id)) });
+  }
+
+  /* ---- Sign in with Google: authorization code flow with PKCE. The app never sees Google's tokens, only a one-time code. ---- */
+  const APP_SCHEME = "com.coachleonidas.ledger";
+  const origin = env.PUBLIC_ORIGIN || url.origin;
+  const cookie = (v: string, age: number) => `lg_o=${v}; Max-Age=${age}; Path=/api/google; HttpOnly; Secure; SameSite=Lax`;
+  const cookieVal = () => /(?:^|; )lg_o=([^;]*)/.exec(req.headers.get("cookie") ?? "")?.[1] ?? "";
+  if (path === "/api/google/start" && req.method === "GET") {
+    if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) return new Response("Google sign-in is not set up yet.", { status: 503 });
+    if (ip && (await limited(db, `gstart:${ip}`, 30, 600))) return tooMany(600);
+    const challenge = url.searchParams.get("c") ?? "";
+    if (!/^[A-Za-z0-9_-]{43}$/.test(challenge)) return new Response("Bad request", { status: 400 });
+    const coachCode = clean(url.searchParams.get("code"), 8).toUpperCase().replace(/[^A-Z0-9]/g, "");
+    const state = b64(rand(24)), verifier = b64(rand(48));
+    const q = new URLSearchParams({
+      client_id: env.GOOGLE_CLIENT_ID, redirect_uri: `${origin}/api/google/callback`, response_type: "code", scope: "openid email profile",
+      state, code_challenge: b64(new Uint8Array(await crypto.subtle.digest("SHA-256", enc.encode(verifier)))), code_challenge_method: "S256", prompt: "select_account",
+    });
+    return new Response(null, { status: 302, headers: { location: `https://accounts.google.com/o/oauth2/v2/auth?${q}`, "set-cookie": cookie(`${state}.${verifier}.${challenge}.${url.searchParams.get("app") === "1" ? "1" : "0"}.${coachCode}`, 600), "cache-control": "no-store" } });
+  }
+  if (path === "/api/google/callback" && req.method === "GET") {
+    const [state, verifier, challenge, app, coachCode] = cookieVal().split(".");
+    const back = (why: string) => (app === "1"
+      ? new Response(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ledger</title><body style="font:18px system-ui;padding:32px 20px"><p>Google sign-in did not finish (${why}). Go back to Ledger and try again.</p>`, { status: 400, headers: { "content-type": "text/html; charset=utf-8", "set-cookie": cookie("", 0) } })
+      : new Response(null, { status: 302, headers: { location: `/?signin=${why}`, "set-cookie": cookie("", 0) } }));
+    if (url.searchParams.get("error")) return back("cancelled");
+    if (!state || !verifier || !challenge || !safeEq(state, url.searchParams.get("state") ?? "")) return back("state");
+    const gcode = url.searchParams.get("code");
+    if (!gcode || !env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) return back("code");
+    const tr = await fetch("https://oauth2.googleapis.com/token", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ code: gcode, client_id: env.GOOGLE_CLIENT_ID, client_secret: env.GOOGLE_CLIENT_SECRET, redirect_uri: `${origin}/api/google/callback`, grant_type: "authorization_code", code_verifier: verifier }) });
+    if (!tr.ok) return back("google");
+    let claims: { iss?: string; aud?: string; sub?: string; email?: string; email_verified?: boolean | string; name?: string; exp?: number };
+    try {
+      const part = String(((await tr.json()) as { id_token?: string }).id_token).split(".")[1];
+      claims = JSON.parse(new TextDecoder().decode(unb64(part)));
+    } catch { return back("token"); }
+    // The token came straight from Google over TLS in exchange for our code, so the claims are checked rather than the signature.
+    const verified = claims.email_verified === true || claims.email_verified === "true";
+    if (!["https://accounts.google.com", "accounts.google.com"].includes(String(claims.iss)) || claims.aud !== env.GOOGLE_CLIENT_ID || !claims.sub || !claims.email || !verified || (claims.exp ?? 0) * 1000 < Date.now()) return back("claims");
+    const email = claims.email.toLowerCase();
+    let u = await db.prepare("SELECT * FROM users WHERE google_sub = ?").bind(claims.sub).first<User>();
+    if (!u) {
+      const byMail = await db.prepare("SELECT * FROM users WHERE email = ?").bind(email).first<User>();
+      if (byMail) { await db.prepare("UPDATE users SET google_sub = ? WHERE id = ?").bind(claims.sub, byMail.id).run(); u = byMail; } // Google has verified this address
+      else {
+        const c = coachCode ? await db.prepare("SELECT id FROM users WHERE invite = ? AND role = 'coach'").bind(coachCode).first<{ id: string }>() : null;
+        const uid = id();
+        await db.prepare("INSERT INTO users (id,email,name,salt,hash,role,coach_id,invite,created,google_sub) VALUES (?,?,?,?,?,?,?,?,?,?)")
+          .bind(uid, email, clean(claims.name, 80) || email.split("@")[0], "", "", "athlete", c?.id ?? null, null, Date.now(), claims.sub).run();
+        u = (await db.prepare("SELECT * FROM users WHERE id = ?").bind(uid).first<User>())!;
+      }
+    }
+    const once = b64(rand(32));
+    await db.prepare("INSERT INTO tokens (hash, user_id, expires) VALUES (?,?,?)").bind(await sha(`xc:${once}:${challenge}`), u.id, Date.now() + 120000).run();
+    if (app === "1") {
+      const link = `${APP_SCHEME}://signin?code=${once}`;
+      return new Response(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Back to Ledger</title><body style="font:18px system-ui;padding:32px 20px"><h1 style="font-size:24px">You are signed in</h1><p>Return to the Ledger app to finish.</p><p><a href="${link}" style="display:inline-block;background:#2f6bff;color:#fff;padding:14px 20px;border-radius:12px;text-decoration:none;font-weight:600">Open Ledger</a></p><script>location.href=${JSON.stringify(link)}</script>`,
+        { status: 200, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "set-cookie": cookie("", 0) } });
+    }
+    return new Response(null, { status: 302, headers: { location: `/#gcode=${once}`, "set-cookie": cookie("", 0), "cache-control": "no-store" } });
+  }
+  if (path === "/api/google/exchange" && req.method === "POST") {
+    if (ip && (await limited(db, `gx:${ip}`, 30, 600))) return tooMany(600);
+    const b = await body<{ code?: string; v?: string }>();
+    if (typeof b.code !== "string" || typeof b.v !== "string" || b.v.length < 32 || b.v.length > 200) return fail(400, "Sign-in expired. Try again.");
+    const challenge = b64(new Uint8Array(await crypto.subtle.digest("SHA-256", enc.encode(b.v))));
+    const h = await sha(`xc:${b.code}:${challenge}`);
+    const row = await db.prepare("SELECT user_id FROM tokens WHERE hash = ? AND expires > ?").bind(h, Date.now()).first<{ user_id: string }>();
+    if (!row) return fail(400, "Sign-in expired. Try again.");
+    await db.prepare("DELETE FROM tokens WHERE hash = ?").bind(h).run();
+    const u = await db.prepare("SELECT * FROM users WHERE id = ?").bind(row.user_id).first<User>();
+    if (!u) return fail(400, "Sign-in expired. Try again.");
+    return json({ token: await newToken(db, u.id), user: pub(u, await coachName(db, u.coach_id)) });
   }
 
   const me = await auth(req, db);
@@ -205,6 +320,8 @@ async function handle(req: Request, env: Env): Promise<Response> {
 
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
-    try { return await handle(req, env); } catch (e) { console.error(e); return fail(500, "Server error. Try again in a moment."); }
+    let res: Response;
+    try { res = await handle(req, env); } catch (e) { console.error(e); res = fail(500, "Server error. Try again in a moment."); }
+    return harden(req, res, env);
   },
 };

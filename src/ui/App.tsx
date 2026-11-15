@@ -11,7 +11,7 @@ import { canUpdate, checkUpdate, ringNow, scheduleRest, syncSystemBars } from ".
 import { Auth } from "./Auth";
 import { Component, type ReactNode } from "react";
 import { Coach } from "./Coach";
-import { resume, setAfterPull, useSync } from "../sync";
+import { resume, setAfterPull, useSync, watchGoogleReturn } from "../sync";
 import { syncMealcost } from "../mealcost";
 
 const TABS = [
@@ -63,7 +63,7 @@ export function App() {
   useEffect(() => { if (user?.role === "coach" && !settings.onboarded) setTab("coach"); }, [user?.role, settings.onboarded]);
   useEffect(() => {
     setAfterPull(async () => { if (useSync.getState().user) await useStore.getState().init(); else useStore.getState().clear(); });
-    void resume();
+    if (!watchGoogleReturn((m) => useStore.getState().say(m))) void resume();
   }, []);
   useEffect(() => { if (ready) void syncMealcost(); }, [ready]);
   useEffect(() => { if (canUpdate) checkUpdate().then((u) => u && useStore.setState({ update: u })).catch(() => {}); }, []);
