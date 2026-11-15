@@ -191,3 +191,6 @@ input[type=range] { width: 100%; accent-color: var(--accent); min-height: 36px; 
 .cell-in { width: 170px; min-height: 44px; padding: 8px 10px; background: transparent; border: 0; border-radius: 0; font-size: .9rem; }
 .cell-in::placeholder { color: var(--faint); }
 .cell-in:focus { outline: 2px solid var(--accent); outline-offset: -2px; background: var(--s2); }
+
+/* keeps scrolled content from running under the status bar on edge-to-edge Android */
+body::before { content: ""; position: fixed; top: 0; left: 0; right: 0; height: var(--sat); background: var(--bg); z-index: 30; pointer-events: none; }
