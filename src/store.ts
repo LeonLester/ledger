@@ -1,0 +1,227 @@
+import { create } from "zustand";
+import { db } from "./db";
+import seedJson from "./data/seed.json";
+import type { Adjustment, BodyWeight, ExerciseDef, ExLog, Feedback, Meso, Seed, Session, Settings, SetLog, Unit } from "./types";
+import { defaultIncrement, isoDate, uid, worked } from "./lib/math";
+import { coarse, guessMuscle } from "./lib/muscles";
+import { effectiveSessions, feedbackDelta, mrvFor, suggestTarget, weekTarget } from "./lib/progression";
+import { lastLog } from "./lib/selectors";
+
+const seed = seedJson as unknown as Seed;
+const ATHLETE = "me";
+const DEFAULTS: Settings = {
+  athleteId: ATHLETE, mode: "feedback", unit: "kg", bar: 20, plates: [25, 20, 15, 10, 5, 2.5, 1.25], restSec: 150,
+  theme: "auto", mesoStart: null, activeMeso: "m3", week: 1,
+};
+
+interface State {
+  ready: boolean; settings: Settings; mesos: Meso[]; sessions: Session[]; feedback: Feedback[]; adjustments: Adjustment[];
+  bodyweight: BodyWeight[]; library: Record<string, ExerciseDef>; targets: Seed["targets"]; landmarks: Seed["landmarks"]; split: Seed["split"];
+  openSession: string | null; update: import("./native").UpdateInfo | null; updateNote: string; rest: { until: number; total: number } | null; toast: string | null;
+  init(): Promise<void>;
+  setSettings(p: Partial<Settings>): void;
+  muscleOf(ex: string): string;
+  startSession(week: number, name: string): string;
+  closeSession(): void;
+  updateEx(sessionId: string, idx: number, fn: (e: ExLog) => ExLog): void;
+  toggleSet(sessionId: string, exIdx: number, setIdx: number): void;
+  addExercise(sessionId: string, name: string): void;
+  finishSession(id: string, fb: Record<string, { pump: number; workload: number }>): void;
+  reopenSession(id: string): void;
+  deleteSession(id: string): void;
+  setSoreness(fbId: string, soreness: number): void;
+  resolveFeedback(fbId: string, accept: boolean): void;
+  addBodyweight(kg: number, date?: string): void;
+  setExercise(name: string, patch: Partial<ExerciseDef>): void;
+  startRest(sec?: number): void; stopRest(): void; say(msg: string): void;
+  exportAll(): Promise<string>; importAll(json: string): Promise<void>; resetAll(): Promise<void>;
+}
+
+const persistSession = (s: Session) => void db.sessions.put(s);
+
+export const useStore = create<State>((set, get) => ({
+  ready: false, settings: DEFAULTS, mesos: [], sessions: [], feedback: [], adjustments: [], bodyweight: [],
+  library: {}, targets: seed.targets, landmarks: seed.landmarks, split: seed.split, openSession: null, update: null, updateNote: "", rest: null, toast: null,
+
+  async init() {
+    let st = await db.settings.get("main");
+    if (!st) {
+      const sessions: Session[] = seed.sessions.map((s) => ({ ...s, athleteId: ATHLETE, status: "done" as const }));
+      const maxWeek = Math.max(...sessions.filter((s) => s.meso === DEFAULTS.activeMeso).map((s) => s.week));
+      await db.transaction("rw", [db.settings, db.mesos, db.sessions, db.kv], async () => {
+        await db.mesos.bulkPut(seed.mesos.map((m) => ({ ...m, athleteId: ATHLETE })));
+        await db.sessions.bulkPut(sessions);
+        const lib: Record<string, ExerciseDef> = {};
+        for (const [name, m] of Object.entries(seed.library)) {
+          const muscle = m === "Unknown" ? guessMuscle(name) : m;
+          lib[name] = { name, muscle, unit: "kg", increment: defaultIncrement("kg"), guessed: m === "Unknown" };
+        }
+        await db.kv.put({ key: "library", value: lib });
+        await db.settings.put({ ...DEFAULTS, week: maxWeek, key: "main" });
+      });
+      st = await db.settings.get("main");
+    }
+    const [mesos, sessions, feedback, adjustments, bodyweight, lib] = await Promise.all([
+      db.mesos.toArray(), db.sessions.toArray(), db.feedback.toArray(), db.adjustments.toArray(), db.bodyweight.toArray(), db.kv.get("library"),
+    ]);
+    const { key: _k, ...settings } = st as Settings & { key: string };
+    set({ ready: true, settings, mesos, sessions, feedback, adjustments, bodyweight, library: (lib?.value as Record<string, ExerciseDef>) ?? {} });
+  },
+
+  setSettings(p) {
+    const settings = { ...get().settings, ...p };
+    set({ settings });
+    void db.settings.put({ ...settings, key: "main" });
+  },
+  muscleOf(ex) { return get().library[ex]?.muscle ?? guessMuscle(ex); },
+
+  startSession(week, name) {
+    const { mesos, settings, sessions, library } = get();
+    const id = `${settings.activeMeso}w${week}-${name}`;
+    if (sessions.some((s) => s.id === id)) { set({ openSession: id }); return id; }
+    const meso = mesos.find((m) => m.id === settings.activeMeso)!;
+    const planned = meso.weeks.find((w) => w.week === week)?.sessions.find((s) => s.name === name);
+    const effective = effectiveSessions(meso, week, get().adjustments, get().muscleOf).find((s) => s.name === name);
+    const exercises: ExLog[] = (effective?.items ?? planned?.items ?? []).map((it) => {
+      const tgt = suggestTarget(it, lastLog(it.exercise, sessions), library[it.exercise]);
+      return {
+        letter: it.letter, exercise: it.exercise, unit: library[it.exercise]?.unit ?? "kg", rir: it.rir, note: null,
+        sets: Array.from({ length: Math.max(1, it.sets) }, () => ({ weight: tgt.weight, reps: null, myo: [] })),
+      };
+    });
+    const s: Session = { id, athleteId: settings.athleteId, meso: settings.activeMeso, week, name, date: isoDate(new Date()), status: "active", exercises, started: Date.now() };
+    set({ sessions: [...sessions, s], openSession: id });
+    persistSession(s);
+    return id;
+  },
+  closeSession() { set({ openSession: null }); },
+
+  updateEx(sessionId, idx, fn) {
+    const sessions = get().sessions.map((s) => {
+      if (s.id !== sessionId) return s;
+      const next = { ...s, exercises: s.exercises.map((e, i) => (i === idx ? fn(e) : e)) };
+      persistSession(next);
+      return next;
+    });
+    set({ sessions });
+  },
+  addExercise(sessionId, name) {
+    const { sessions, library } = get();
+    const lg = lastLog(name, sessions);
+    const w = lg?.sets[0]?.weight ?? null;
+    const next = sessions.map((s) => {
+      if (s.id !== sessionId) return s;
+      const ex: ExLog = { letter: String.fromCharCode(65 + s.exercises.length), exercise: name, unit: library[name]?.unit ?? "kg", rir: 2, note: null, sets: [{ weight: w, reps: null, myo: [] }, { weight: w, reps: null, myo: [] }] };
+      const n = { ...s, exercises: [...s.exercises, ex] };
+      persistSession(n);
+      return n;
+    });
+    set({ sessions: next });
+  },
+  toggleSet(sessionId, exIdx, setIdx) {
+    let started = false;
+    get().updateEx(sessionId, exIdx, (e) => ({
+      ...e, sets: e.sets.map((s, i) => {
+        if (i !== setIdx) return s;
+        const done = !s.done; started = done;
+        return { ...s, done };
+      }),
+    }));
+    if (started) get().startRest();
+  },
+
+  finishSession(id, fb) {
+    const { sessions, feedback, settings, adjustments } = get();
+    const sess = sessions.find((s) => s.id === id)!;
+    const cleaned: Session = { ...sess, status: "done", finished: Date.now(),
+      exercises: sess.exercises.map((e) => ({ ...e, sets: e.sets.map((s) => ({ ...s, done: s.done || worked(s) })) })).filter((e) => e.sets.some(worked)) };
+    const rows: Feedback[] = Object.entries(fb).map(([muscle, v]) => ({
+      id: `${id}:${muscle}`, athleteId: settings.athleteId, sessionId: id, meso: sess.meso, week: sess.week, muscle,
+      pump: v.pump, workload: v.workload, soreness: null, delta: null, state: "pending" as const,
+    }));
+    const keep = feedback.filter((f) => f.sessionId !== id);
+    set({ sessions: sessions.map((s) => (s.id === id ? cleaned : s)), feedback: [...keep, ...rows], openSession: null });
+    persistSession(cleaned);
+    void db.feedback.bulkPut(rows);
+    void adjustments;
+  },
+  reopenSession(id) {
+    const sessions = get().sessions.map((s) => (s.id === id ? { ...s, status: "active" as const } : s));
+    set({ sessions, openSession: id });
+    persistSession(sessions.find((s) => s.id === id)!);
+  },
+  deleteSession(id) {
+    set({ sessions: get().sessions.filter((s) => s.id !== id), openSession: null });
+    void db.sessions.delete(id);
+  },
+
+  /** Soreness is rated when the muscle is next trained. It completes the pump + soreness pair and yields a set suggestion. */
+  setSoreness(fbId, soreness) {
+    const { feedback, settings, sessions, targets, landmarks } = get();
+    const f = feedback.find((x) => x.id === fbId);
+    if (!f) return;
+    let delta = feedbackDelta(f.pump, soreness, f.workload);
+    const nextWeek = f.week + 1;
+    const meso = get().mesos.find((m) => m.id === f.meso);
+    if (!meso?.weeks.some((w) => w.week === nextWeek)) delta = 0;
+    // do not exceed MRV for the next week
+    const base = weekTarget(f.muscle, nextWeek, targets) ?? weekTarget(coarse(f.muscle), nextWeek, targets);
+    const mrv = mrvFor(f.muscle, landmarks);
+    if (delta > 0 && base != null && mrv != null && base + delta > mrv) delta = Math.max(0, mrv - base);
+    const next: Feedback = { ...f, soreness, delta, state: settings.mode === "auto" ? "applied" : "pending" };
+    set({ feedback: feedback.map((x) => (x.id === fbId ? next : x)) });
+    void db.feedback.put(next);
+    void sessions;
+    if (settings.mode === "auto") get().resolveFeedback(fbId, true);
+  },
+  resolveFeedback(fbId, accept) {
+    const { feedback, adjustments, settings } = get();
+    const f = feedback.find((x) => x.id === fbId);
+    if (!f) return;
+    const next: Feedback = { ...f, state: accept ? "applied" : "skipped" };
+    const fbs = feedback.map((x) => (x.id === fbId ? next : x));
+    let adj = adjustments;
+    if (accept && f.delta) {
+      const a: Adjustment = { id: `adj:${fbId}`, athleteId: settings.athleteId, meso: f.meso, week: f.week + 1, muscle: f.muscle, delta: f.delta, source: "feedback" };
+      adj = [...adjustments.filter((x) => x.id !== a.id), a];
+      void db.adjustments.put(a);
+    }
+    set({ feedback: fbs, adjustments: adj });
+    void db.feedback.put(next);
+  },
+
+  addBodyweight(kg, date = isoDate(new Date())) {
+    const row: BodyWeight = { id: uid(), athleteId: get().settings.athleteId, date, kg };
+    set({ bodyweight: [...get().bodyweight, row].sort((a, b) => a.date.localeCompare(b.date)) });
+    void db.bodyweight.put(row);
+  },
+  setExercise(name, patch) {
+    const library = { ...get().library, [name]: { ...get().library[name], name, ...patch, guessed: false } as ExerciseDef };
+    set({ library });
+    void db.kv.put({ key: "library", value: library });
+  },
+
+  startRest(sec) {
+    const total = sec ?? get().settings.restSec;
+    set({ rest: { until: Date.now() + total * 1000, total } });
+  },
+  stopRest() { set({ rest: null }); },
+  say(msg) { set({ toast: msg }); setTimeout(() => get().toast === msg && set({ toast: null }), 2600); },
+
+  async exportAll() {
+    const s = get();
+    return JSON.stringify({ app: "ledger", version: 1, exported: new Date().toISOString(), settings: s.settings, mesos: s.mesos, sessions: s.sessions, feedback: s.feedback, adjustments: s.adjustments, bodyweight: s.bodyweight, library: s.library }, null, 1);
+  },
+  async importAll(json) {
+    const d = JSON.parse(json);
+    if (d.app !== "ledger") throw new Error("This file is not a Ledger backup.");
+    await db.delete(); await db.open();
+    await db.settings.put({ ...d.settings, key: "main" });
+    await db.mesos.bulkPut(d.mesos); await db.sessions.bulkPut(d.sessions); await db.feedback.bulkPut(d.feedback ?? []);
+    await db.adjustments.bulkPut(d.adjustments ?? []); await db.bodyweight.bulkPut(d.bodyweight ?? []); await db.kv.put({ key: "library", value: d.library });
+    await get().init();
+  },
+  async resetAll() { await db.delete(); await db.open(); await get().init(); },
+}));
+
+export type { SetLog, Unit };

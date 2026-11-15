@@ -1,0 +1,38 @@
+{
+  "name": "lift-log",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host",
+    "seed": "python3 scripts/build_seed.py \"$SRC\" src/data/seed.json",
+    "deploy": "npm run build && wrangler deploy",
+    "build:web": "node scripts/build-web.mjs",
+    "android:sync": "npm run build && npm run build:web && cap sync android",
+    "android:build": "npm run android:sync && cd android && ./gradlew assembleRelease"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.6.2",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/core": "^8.6.2",
+    "@fontsource-variable/hanken-grotesk": "^5.1.0",
+    "@fontsource/big-shoulders-display": "^5.1.0",
+    "dexie": "^4.0.8",
+    "lucide-react": "^0.453.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zustand": "^4.5.5"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.6.2",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.3",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10",
+    "vite-plugin-pwa": "^0.20.5",
+    "wrangler": "^4.160.0"
+  }
+}

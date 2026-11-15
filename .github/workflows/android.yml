@@ -1,0 +1,95 @@
+name: Android app
+
+on:
+  push:
+    branches: [main]
+    paths: ['src/**', 'public/**', 'android/**', 'capacitor.config.json', 'package*.json', 'scripts/**', 'index.html', 'vite.config.ts', '.github/workflows/android.yml']
+  workflow_dispatch:
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v4
+      - run: npm ci
+      - name: Build web assets and sync into the Android project
+        run: npm run android:sync
+        env:
+          BUILD_NUMBER: ${{ github.run_number }}
+
+      # A stable signing key lets each new APK install over the previous one without losing data.
+      # Preferred: repository secrets. Fallback: create one and keep it in the Actions cache.
+      - name: Restore cached signing key
+        uses: actions/cache@v4
+        with:
+          path: ~/.ledger-ci/ledger.keystore
+          key: ledger-android-keystore-v1
+      - name: Prepare signing key
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          SECRET_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          SECRET_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          mkdir -p ~/.ledger-ci
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > ~/.ledger-ci/ledger.keystore
+            echo "ANDROID_KEYSTORE_PASSWORD=$SECRET_PASS" >> "$GITHUB_ENV"
+            echo "ANDROID_KEY_PASSWORD=$SECRET_PASS" >> "$GITHUB_ENV"
+            echo "ANDROID_KEY_ALIAS=${SECRET_ALIAS:-ledger}" >> "$GITHUB_ENV"
+          else
+            if [ ! -f ~/.ledger-ci/ledger.keystore ]; then
+              keytool -genkeypair -v -keystore ~/.ledger-ci/ledger.keystore -alias ledger \
+                -keyalg RSA -keysize 2048 -validity 36500 -storepass ledger-ci -keypass ledger-ci \
+                -dname "CN=Ledger, O=Coach Leonidas, C=CZ"
+            fi
+            echo "ANDROID_KEYSTORE_PASSWORD=ledger-ci" >> "$GITHUB_ENV"
+            echo "ANDROID_KEY_PASSWORD=ledger-ci" >> "$GITHUB_ENV"
+            echo "ANDROID_KEY_ALIAS=ledger" >> "$GITHUB_ENV"
+          fi
+          echo "ANDROID_KEYSTORE_FILE=$HOME/.ledger-ci/ledger.keystore" >> "$GITHUB_ENV"
+          echo "ANDROID_VERSION_CODE=${{ github.run_number }}" >> "$GITHUB_ENV"
+          echo "ANDROID_VERSION_NAME=1.0.${{ github.run_number }}" >> "$GITHUB_ENV"
+
+      - name: Build the release APK
+        working-directory: android
+        run: ./gradlew --no-daemon assembleRelease
+
+      - name: Check the APK
+        run: |
+          APK=android/app/build/outputs/apk/release/app-release.apk
+          BT=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -1)
+          $BT/apksigner verify --print-certs "$APK" | head -5
+          $BT/aapt2 dump badging "$APK" | grep -E "package:|application-label:|targetSdkVersion"
+          mkdir -p dist-apk && cp "$APK" dist-apk/ledger.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ledger-apk
+          path: dist-apk/ledger.apk
+          retention-days: 30
+
+      - name: Publish the APK as a release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG=android-latest
+          gh release view $TAG >/dev/null 2>&1 || gh release create $TAG --prerelease --title "Android app (latest build)" --notes "Build ${{ github.run_number }}"
+          gh release upload $TAG dist-apk/ledger.apk --clobber
+          gh release edit $TAG --notes "Build ${{ github.run_number }} from ${{ github.sha }}. Download ledger.apk on your phone and open it to install. Every build after the first installs over the previous one and keeps your data."

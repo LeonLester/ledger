@@ -1,0 +1,6 @@
+{
+  "appId": "com.coachleonidas.ledger",
+  "appName": "Ledger",
+  "webDir": "www",
+  "android": { "allowMixedContent": false }
+}
