@@ -32,13 +32,13 @@ DESK = [
 ]
 
 CSS = f"""
-@font-face {{ font-family: 'BSD'; font-weight: 800; src: url('file://{FONTS}/@fontsource/big-shoulders-display/files/big-shoulders-display-latin-800-normal.woff2'); }}
-@font-face {{ font-family: 'HG'; font-weight: 100 900; src: url('file://{FONTS}/@fontsource-variable/hanken-grotesk/files/hanken-grotesk-latin-wght-normal.woff2'); }}
+@font-face {{ font-family: 'BSD'; font-weight: 100 900; src: url('file://{FONTS}/@fontsource-variable/montserrat/files/montserrat-latin-wght-normal.woff2'); }}
+@font-face {{ font-family: 'HG'; font-weight: 100 900; src: url('file://{FONTS}/@fontsource-variable/montserrat/files/montserrat-latin-wght-normal.woff2'); }}
 * {{ box-sizing: border-box; margin: 0; }}
 body {{ background: #0b0d10; font-family: 'HG', sans-serif; color: #f2f2ee; overflow: hidden; }}
 .card {{ position: relative; overflow: hidden; background: radial-gradient(900px 700px at 85% -5%, #1b3a8a66, transparent 60%), radial-gradient(700px 600px at 0% 100%, #2f6bff22, transparent 60%), #0e1116; }}
 .k {{ color: #5b8dff; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; font-size: 26px; }}
-h1 {{ font-family: 'BSD'; font-weight: 800; line-height: .98; letter-spacing: .005em; }}
+h1 {{ font-family: 'BSD'; font-weight: 700; line-height: 1.04; letter-spacing: -.02em; }}
 p {{ color: #aab1bb; line-height: 1.4; }}
 .brand {{ position: absolute; font-family: 'BSD'; font-weight: 800; color: #f2f2ee; opacity: .9; }}
 .phone {{ position: absolute; border-radius: 76px; padding: 13px; background: #1a1f26; box-shadow: 0 0 0 2px #2d343d, 0 50px 120px -20px #000c, inset 0 0 0 2px #0006; }}
@@ -52,13 +52,13 @@ p {{ color: #aab1bb; line-height: 1.4; }}
 def phone_html(f, k, h, t):
     return f"""<div class="card" style="width:1080px;height:1350px">
   <div class="brand" style="left:72px;top:60px;font-size:44px">Ledger</div>
-  <div style="position:absolute;left:72px;top:150px;width:936px"><div class="k">{k}</div><h1 style="font-size:98px;margin-top:14px">{h}</h1><p style="font-size:31px;margin-top:22px;max-width:860px">{t}</p></div>
+  <div style="position:absolute;left:72px;top:150px;width:936px"><div class="k">{k}</div><h1 style="font-size:76px;margin-top:14px">{h}</h1><p style="font-size:31px;margin-top:22px;max-width:860px">{t}</p></div>
   <div class="phone" style="width:620px;left:230px;top:560px"><img src="file://{RAW}/{f}.png"></div></div>"""
 
 def desk_html(f, k, h, t):
     return f"""<div class="card" style="width:1600px;height:1000px">
   <div class="brand" style="left:80px;top:64px;font-size:46px">Ledger</div>
-  <div style="position:absolute;left:80px;top:250px;width:520px"><div class="k">{k}</div><h1 style="font-size:96px;margin-top:14px">{h}</h1><p style="font-size:30px;margin-top:24px">{t}</p></div>
+  <div style="position:absolute;left:80px;top:250px;width:520px"><div class="k">{k}</div><h1 style="font-size:70px;margin-top:14px">{h}</h1><p style="font-size:30px;margin-top:24px">{t}</p></div>
   <div class="win" style="left:660px;top:150px;width:880px"><div class="bar"><i></i><i></i><i></i></div><img src="file://{RAW}/{f}.png"></div></div>"""
 
 def main():
