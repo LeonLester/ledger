@@ -5,6 +5,7 @@ import { PROGRAMS, trainingMaxes } from "../src/data/programs.ts";
 import { sessionPrs } from "../src/lib/pr.ts";
 import { parseSets } from "../src/lib/sheet.ts";
 import { expand } from "../src/lib/expand.ts";
+import { setFormulas, est1rm, weightForReps, checkFormula, compile, score, parseWarm } from "../src/lib/formulas.ts";
 
 let fails = 0;
 const ok = (c, m) => { if (!c) { fails++; console.log("FAIL", m); } else console.log("ok  ", m); };
@@ -91,6 +92,22 @@ const ex = expand(base, 5, 3, 1, true);
 ok(ex.length === 5 && ex[0].sessions[0].items[0].rir === 3 && ex[3].sessions[0].items[0].rir === 1, "custom block: RIR ramps");
 ok(ex[4].sessions[0].items[0].sets === 2 && ex[4].sessions[0].items[0].rir === 4, "custom block: deload halves sets");
 ok(ex[0].sessions[0].items.length === 1, "custom block: blank exercises dropped");
+
+// formulas
+ok(Math.abs(est1rm(100, 5) - 116.667) < 0.01, "e1RM epley default");
+setFormulas({ e1rm: "brzycki" });
+ok(Math.abs(est1rm(100, 5) - 112.5) < 0.01, "e1RM brzycki");
+ok(Math.abs(weightForReps(est1rm(100, 8), 8) - 100) < 0.01, "rep max inverts the formula");
+setFormulas({ e1rm: "custom", custom: "w * (1 + 0.03 * r)" });
+ok(Math.abs(est1rm(100, 5) - 115) < 0.01, "e1RM custom formula");
+ok(checkFormula("w *") !== null && checkFormula("process.exit()") !== null && checkFormula("w * (1 + r / 30)") === null, "custom formula validation");
+ok(compile("2 ^ 3 ^ 2")(0, 0) === 512 && compile("-w + 10")(4, 0) === 6, "expression precedence");
+setFormulas({ e1rm: "epley", useRir: true });
+ok(Math.abs(est1rm(100, 5 + 2) - 123.33) < 0.01, "rir option uses effective reps");
+setFormulas(undefined);
+const d = score(500, 80, "m", "dots"), w = score(500, 80, "m", "wilks"), g = score(500, 80, "m", "ipf");
+ok(d > 300 && d < 400 && w > 300 && w < 450 && g > 60 && g < 90, `scores in range: ${d.toFixed(1)} ${w.toFixed(1)} ${g.toFixed(1)}`);
+ok(parseWarm("40%x8, 60 x 5")?.length === 2 && parseWarm("junk") === null, "warm-up parsing");
 
 console.log(fails ? `\n${fails} failed` : "\nall passed");
 process.exit(fails ? 1 : 0);

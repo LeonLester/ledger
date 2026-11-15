@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { ChevronDown } from "lucide-react";
+import { E1RM_LABEL, formulas } from "../lib/formulas";
 import { useData } from "../lib/view";
 import type { Session } from "../types";
 import { bestE1rm, fmtW, topSet, workedSets } from "../lib/math";
@@ -119,7 +120,7 @@ function Trends() {
   const dateRanges = [{ v: 1, label: "1M" }, { v: 3, label: "3M" }, { v: 6, label: "6M" }, { v: 12, label: "1Y" }, { v: 0, label: "All" }];
   return (
     <div className="stack-lg">
-      <p className="sub">Estimated 1RM by the Epley formula. Pin-stack lifts chart the pin position.</p>
+      <p className="sub">Estimated 1RM by the {E1RM_LABEL[formulas().e1rm]} formula (change it under More, Formulas). Pin-stack lifts chart the pin position.</p>
       <section className="stack">
         <LiftPicker options={counts} value={chosen} onChange={setSel} />
         {chosen.length > 1 && <Seg value={rel ? "rel" : "abs"} onChange={(v) => setRel(v === "rel")} label="Scale" options={[{ v: "abs", label: "Actual load" }, { v: "rel", label: "% of first" }]} />}

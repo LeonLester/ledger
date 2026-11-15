@@ -6,7 +6,8 @@ import { setsPerMuscle } from "../lib/selectors";
 
 export function Volume() {
   const { mesos, settings, sessions, targets, landmarks, library, muscleOf, adjustments, setSettings } = useStore();
-  const meso = mesos.find((m) => m.id === settings.activeMeso)!;
+  const meso = mesos.find((m) => m.id === settings.activeMeso) ?? mesos[mesos.length - 1];
+  if (!meso) return null;
   const week = settings.week;
   const weeks = meso.weeks.map((w) => w.week);
   const done = setsPerMuscle(sessions, meso.id, week, muscleOf);

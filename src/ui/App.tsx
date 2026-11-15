@@ -9,8 +9,10 @@ import { More } from "./More";
 import { Welcome } from "./Programs";
 import { canUpdate, checkUpdate } from "../native";
 import { Auth } from "./Auth";
+import { Component, type ReactNode } from "react";
 import { Coach } from "./Coach";
 import { resume, setAfterPull, useSync } from "../sync";
+import { syncMealcost } from "../mealcost";
 
 const TABS = [
   { id: "train", label: "Train", Icon: Dumbbell }, { id: "plan", label: "Plan", Icon: CalendarRange },
@@ -42,8 +44,20 @@ function RestBar() {
   void startRest;
 }
 
+/** Shows what went wrong instead of a blank screen. */
+class Boundary extends Component<{ children: ReactNode; reset: unknown }, { err: Error | null; at: unknown }> {
+  state = { err: null as Error | null, at: this.props.reset };
+  static getDerivedStateFromError(err: Error) { return { err }; }
+  static getDerivedStateFromProps(p: { reset: unknown }, s: { at: unknown }) { return p.reset !== s.at ? { err: null, at: p.reset } : null; }
+  render() {
+    if (!this.state.err) return this.props.children;
+    return <div className="stack"><h2>Something went wrong on this screen</h2><p className="dim small">{this.state.err.message}</p>
+      <div className="row"><button className="btn" onClick={() => this.setState({ err: null })}>Try again</button><button className="btn" onClick={() => location.reload()}>Reload the app</button></div></div>;
+  }
+}
+
 export function App() {
-  const { ready, settings, toast, openSession } = useStore();
+  const { ready, settings, toast, openSession, mesos } = useStore();
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("train");
   const { phase, user } = useSync();
   useEffect(() => { if (user?.role === "coach" && !settings.onboarded) setTab("coach"); }, [user?.role, settings.onboarded]);
@@ -51,6 +65,7 @@ export function App() {
     setAfterPull(async () => { if (useSync.getState().user) await useStore.getState().init(); else useStore.getState().clear(); });
     void resume();
   }, []);
+  useEffect(() => { if (ready) void syncMealcost(); }, [ready]);
   useEffect(() => { if (canUpdate) checkUpdate().then((u) => u && useStore.setState({ update: u })).catch(() => {}); }, []);
   useEffect(() => {
     const r = document.documentElement;
@@ -58,7 +73,7 @@ export function App() {
   }, [settings.theme]);
   if (phase === "out") return <Auth />;
   if (phase === "booting" || !ready) return <div className="main"><h1>Ledger</h1><p className="sub">Loading your log</p></div>;
-  const noProgram = !settings.onboarded;
+  const noProgram = !settings.onboarded || mesos.length === 0;
   if (noProgram && user?.role !== "coach") return <Welcome />;
   return (
     <div className="app">
@@ -69,8 +84,8 @@ export function App() {
         ))}
       </nav>
       <main className="main" id="main" data-open={openSession ? "1" : undefined}>
-        {noProgram && ["train", "plan", "volume", "progress"].includes(tab) ? <Welcome /> : <>
-          {tab === "train" && <Train />}{tab === "plan" && <Plan />}{tab === "volume" && <Volume />}{tab === "progress" && <Progress />}{tab === "coach" && <Coach />}{tab === "more" && <More />}</>}
+        <Boundary reset={tab}>{noProgram && ["train", "plan", "volume", "progress"].includes(tab) ? <Welcome /> : <>
+          {tab === "train" && <Train />}{tab === "plan" && <Plan />}{tab === "volume" && <Volume />}{tab === "progress" && <Progress />}{tab === "coach" && <Coach />}{tab === "more" && <More />}</>}</Boundary>
       </main>
       <RestBar />
       {toast && <div className="toast" role="status">{toast}</div>}

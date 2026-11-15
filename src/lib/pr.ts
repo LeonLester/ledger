@@ -1,5 +1,6 @@
 import type { BodyWeight, ExLog, Session } from "../types";
-import { epley, fmtW, worked } from "./math";
+import { fmtW, worked } from "./math";
+import { effReps, est1rm, weightForReps } from "./formulas";
 import { orderKey, sessionDate } from "./selectors";
 
 const LB = 0.45359;
@@ -21,7 +22,7 @@ function rowsOf(e: ExLog, bw: number | null, onlyDone: boolean): { r: Row; i: nu
   e.sets.forEach((s, i) => {
     if (!worked(s) || s.weight == null || (onlyDone && !s.done)) return;
     const w = kgOf(e, s.weight);
-    out.push({ i, r: { w, ow: s.weight, reps: s.reps!, e1: e.unit === "pin" || s.reps! > 12 ? null : epley(w, s.reps!), bw } });
+    out.push({ i, r: { w, ow: s.weight, reps: s.reps!, e1: e.unit === "pin" || s.reps! > 12 ? null : est1rm(w, effReps(s)), bw } });
   });
   return out;
 }
@@ -67,7 +68,7 @@ export function sessionPrs(
   return out;
 }
 
-/** weight for n reps at an estimated 1RM, inverse Epley */
-export const repMax = (e1: number, n: number) => (n <= 1 ? e1 : e1 / (1 + n / 30));
+/** weight for n reps at an estimated 1RM, from the selected formula */
+export const repMax = weightForReps;
 /** relative intensity of a set against the best e1RM known at that time, as a fraction */
 export const intensity = (w: number, e1: number) => (e1 > 0 ? w / e1 : 0);

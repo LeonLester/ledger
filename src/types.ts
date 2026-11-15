@@ -27,13 +27,13 @@ export interface Feedback {
   state: "pending" | "applied" | "skipped";
 }
 export interface Adjustment { id: string; athleteId: string; meso: string; week: number; muscle: string; delta: number; source: "feedback" | "manual" }
-export interface BodyWeight { id: string; athleteId: string; date: string; kg: number }
+export interface BodyWeight { id: string; athleteId: string; date: string; kg: number; src?: "mealcost" }
 export interface ExerciseDef { name: string; muscle: string; unit: Unit; increment: number; guessed?: boolean }
 
 export interface Settings {
   athleteId: string; mode: Mode; unit: Unit; bar: number; plates: number[]; restSec: number;
   theme: "auto" | "dark" | "light"; mesoStart: string | null; activeMeso: string; week: number;
-  onboarded?: boolean; effort?: "rir" | "rpe"; sex?: "m" | "f"; tms?: Partial<Record<LiftKey, number>>; liftMap?: Partial<Record<LiftKey, string>>;
+  fx?: import("./lib/formulas").Formulas; onboarded?: boolean; effort?: "rir" | "rpe"; sex?: "m" | "f"; tms?: Partial<Record<LiftKey, number>>; liftMap?: Partial<Record<LiftKey, string>>;
 }
 export interface Seed {
   mesos: Meso[]; sessions: Omit<Session, "athleteId" | "status">[]; library: Record<string, string>;

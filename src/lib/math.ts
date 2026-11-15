@@ -1,6 +1,6 @@
 import type { ExLog, SetLog, Unit } from "../types";
+import { DEFAULT_WARM, effReps, est1rm, formulas } from "./formulas";
 
-export const epley = (w: number, r: number) => (r <= 1 ? w : w * (1 + r / 30));
 export const round = (n: number, step = 0.5) => Math.round(n / step) * step;
 export const fmtW = (n: number | null | undefined) => (n == null ? "" : Number.isInteger(n) ? String(n) : String(+n.toFixed(2)));
 export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
@@ -17,7 +17,7 @@ export function bestE1rm(e: ExLog): number | null {
   for (const s of e.sets) {
     if (s.weight == null || !worked(s)) continue;
     const w = e.unit === "lb" ? s.weight * 0.45359 : s.weight;
-    const v = epley(w, s.reps! + s.myo.reduce((a, b) => a + b, 0) * 0 );
+    const v = est1rm(w, effReps(s));
     if (best == null || v > best) best = v;
   }
   return best;
@@ -41,7 +41,7 @@ export function plateLoad(target: number, bar: number, plates: number[]) {
 }
 export function warmups(work: number, inc: number) {
   if (!work || work < 20) return [];
-  const steps: [number, number][] = [[0.4, 8], [0.6, 5], [0.8, 3]];
+  const steps: [number, number][] = formulas().warm?.length ? formulas().warm! : DEFAULT_WARM;
   return steps.map(([p, r]) => ({ weight: Math.max(inc, Math.round((work * p) / inc) * inc), reps: r }));
 }
 export function isoDate(d: Date) { return d.toISOString().slice(0, 10); }

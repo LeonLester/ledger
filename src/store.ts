@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { db } from "./db";
 import { markAllDirty, resetRemote } from "./sync";
+import { setFormulas } from "./lib/formulas";
 import seedJson from "./data/seed.json";
 import type { Adjustment, BodyWeight, ExerciseDef, ExLog, Feedback, Meso, Seed, Session, Settings, SetLog, Unit } from "./types";
 import { defaultIncrement, isoDate, uid, worked } from "./lib/math";
@@ -55,6 +56,7 @@ interface State {
   setSoreness(fbId: string, soreness: number): void;
   resolveFeedback(fbId: string, accept: boolean): void;
   addBodyweight(kg: number, date?: string): void;
+  applyMealcost(list: { date: string; kg: number }[]): number;
   setExercise(name: string, patch: Partial<ExerciseDef>): void;
   startRest(sec?: number): void; stopRest(): void; say(msg: string): void;
   exportAll(): Promise<string>; importAll(json: string): Promise<void>; resetAll(): Promise<void>;
@@ -112,10 +114,19 @@ export const useStore = create<State>((set, get) => ({
     const [mesos, sessions, feedback, adjustments, bodyweight, lib, sp] = await Promise.all([
       db.mesos.toArray(), db.sessions.toArray(), db.feedback.toArray(), db.adjustments.toArray(), db.bodyweight.toArray(), db.kv.get("library"), db.kv.get("split"),
     ]);
-    const { key: _k, ...settings } = st as Settings & { key: string };
+    const { key: _k, ...loaded } = st as Settings & { key: string };
+    let settings: Settings = loaded;
+    // repair a settings row that points at a block or week that does not exist, which would leave Train, Plan and Volume empty
+    if (mesos.length) {
+      const m = mesos.find((x) => x.id === settings.activeMeso) ?? [...mesos].sort((a, b) => mesoNum(b.id) - mesoNum(a.id))[0];
+      const weeks = m.weeks.map((w) => w.week);
+      const week = weeks.includes(settings.week) ? settings.week : weeks[0];
+      if (m.id !== settings.activeMeso || week !== settings.week) { settings = { ...settings, activeMeso: m.id, week }; await db.settings.put({ ...settings, key: "main" }); }
+    }
     const stored = (lib?.value as Record<string, ExerciseDef>) ?? {};
     const library = ensureCatalog(stored);
     if (Object.keys(library).length !== Object.keys(stored).length) void db.kv.put({ key: "library", value: library });
+    setFormulas(settings.fx);
     set({ ready: true, settings, mesos, sessions, feedback, adjustments, bodyweight, library, split: (sp?.value as Seed["split"]) ?? (settings.onboarded && mesos.length ? seed.split : []) });
   },
 
@@ -161,6 +172,7 @@ export const useStore = create<State>((set, get) => ({
 
   setSettings(p) {
     const settings = { ...get().settings, ...p };
+    if ("fx" in p) setFormulas(settings.fx);
     set({ settings });
     void db.settings.put({ ...settings, key: "main" });
   },
@@ -293,6 +305,21 @@ export const useStore = create<State>((set, get) => ({
     const row: BodyWeight = { id: uid(), athleteId: get().settings.athleteId, date, kg };
     set({ bodyweight: [...get().bodyweight, row].sort((a, b) => a.date.localeCompare(b.date)) });
     void db.bodyweight.put(row);
+  },
+  /** Weigh-ins from Mealcost. Entries you typed here win for the same day, and entries that left Mealcost are removed. */
+  applyMealcost(list) {
+    const { bodyweight, settings } = get();
+    const manual = new Set(bodyweight.filter((b) => b.src !== "mealcost").map((b) => b.date));
+    const want = new Map(list.filter((w) => !manual.has(w.date)).map((w) => [w.date, w.kg]));
+    const have = new Map(bodyweight.filter((b) => b.src === "mealcost").map((b) => [b.date, b]));
+    const puts: BodyWeight[] = [], drops: string[] = [];
+    for (const [date, kg] of want) { const cur = have.get(date); if (!cur || cur.kg !== kg) puts.push({ id: `mc:${date}`, athleteId: settings.athleteId, date, kg, src: "mealcost" }); }
+    for (const [date, b] of have) if (!want.has(date)) drops.push(b.id);
+    if (!puts.length && !drops.length) return 0;
+    const next = [...bodyweight.filter((b) => !drops.includes(b.id) && !puts.some((p) => p.id === b.id)), ...puts].sort((a, b) => a.date.localeCompare(b.date));
+    set({ bodyweight: next });
+    void db.bodyweight.bulkPut(puts); void db.bodyweight.bulkDelete(drops);
+    return puts.length + drops.length;
   },
   setExercise(name, patch) {
     const library = { ...get().library, [name]: { ...get().library[name], name, ...patch, guessed: false } as ExerciseDef };

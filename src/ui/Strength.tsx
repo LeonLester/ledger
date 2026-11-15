@@ -6,15 +6,9 @@ import { PR_LABEL, repMax, sessionPrs } from "../lib/pr";
 import { sessionDate, sortSessions } from "../lib/selectors";
 import type { LiftKey } from "../types";
 import { LineChart, Seg } from "./common";
+import { SCORE_LABEL, formulas, score } from "../lib/formulas";
 
-const DOTS = {
-  m: [-307.75076, 24.0900756, -0.1918759221, 0.0007391293, -0.000001093],
-  f: [-57.96288, 13.6175032, -0.1126655495, 0.0005158568, -0.0000010706],
-};
-export const dots = (total: number, bw: number, sex: "m" | "f") => {
-  const c = DOTS[sex]; const x = Math.min(bw, sex === "m" ? 210 : 150);
-  return (500 / (c[0] + c[1] * x + c[2] * x ** 2 + c[3] * x ** 3 + c[4] * x ** 4)) * total;
-};
+export const dots = (total: number, bw: number, sex: "m" | "f") => score(total, bw, sex);
 
 export function Strength() {
   const { sessions, settings, setSettings, library, bodyweight } = useData();
@@ -80,7 +74,7 @@ export function Strength() {
               <td className="num">{bw && best[l] ? (best[l] / bw).toFixed(2) : ""}</td></tr>;
           })}
         </tbody></table>
-        {bw && total > 0 ? <p className="small">DOTS at {fmtW(bw)} kg bodyweight: <b className="num">{dots(total, bw, settings.sex ?? "m").toFixed(1)}</b>. Based on estimated, not tested, maxes.</p> : <p className="faint xs">Log your bodyweight in Trends to see DOTS and strength per kilo.</p>}
+        {bw && total > 0 ? <p className="small">{SCORE_LABEL[formulas().score ?? "dots"]} at {fmtW(bw)} kg bodyweight: <b className="num">{dots(total, bw, settings.sex ?? "m").toFixed(1)}</b>. Based on estimated, not tested, maxes.</p> : <p className="faint xs">Log your bodyweight in Trends to see DOTS and strength per kilo.</p>}
         <label className="field"><span>Which exercise counts as {LIFT_LABEL[sel].toLowerCase()}</span>
           <select className="input" value={map[sel]} onChange={(e) => setSettings({ liftMap: { ...settings.liftMap, [sel]: e.target.value } })}>{[...new Set([map[sel], ...names])].map((n) => <option key={n}>{n}</option>)}</select></label>
       </section>

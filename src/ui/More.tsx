@@ -3,8 +3,9 @@ import { Download, Upload } from "lucide-react";
 import { useStore } from "../store";
 import { sessionDate, sortSessions } from "../lib/selectors";
 import { Seg } from "./common";
-import { epley } from "../lib/math";
+import { DEFAULT_WARM, E1RM_LABEL, E1RM_TEXT, SCORE_LABEL, checkFormula, est1rm, formulas, parseWarm, warmText, compile, type E1rmKey, type ScoreKey } from "../lib/formulas";
 import { api } from "../api";
+import { LINK_PAGE, connectMealcost, disconnectMealcost, syncMealcost, useMealcost } from "../mealcost";
 import { joinCoach, logout, syncNow, useSync } from "../sync";
 import { BUILD, canUpdate, checkUpdate, checkWebUpdate, installUpdate, isNative } from "../native";
 
@@ -12,6 +13,68 @@ function save(name: string, text: string, type = "text/plain") {
   const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
 const csv = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+
+function MealcostLink() {
+  const mc = useMealcost();
+  const say = useStore((s) => s.say);
+  const [code, setCode] = useState("");
+  return (
+    <section className="panel stack" style={{ padding: 16 }}>
+      <h3>Mealcost</h3>
+      {mc.linked ? (
+        <>
+          <p className="small">Connected. Your weigh-ins from Mealcost appear in Progress, Bodyweight and feed PR checks and strength scores. {mc.count ? `${mc.count} weigh-ins` : ""}{mc.last ? `, last read ${new Date(mc.last).toLocaleString([], { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}` : ""}.</p>
+          {mc.error && <p role="alert" style={{ color: "var(--red)", margin: 0 }}>{mc.error}</p>}
+          <p className="faint xs">A weigh-in typed in Ledger wins over Mealcost for the same day.</p>
+          <div className="row wrap"><button className="btn" disabled={mc.busy} onClick={() => void syncMealcost().then((ok) => ok && say("Weight updated from Mealcost"))}>{mc.busy ? "Reading" : "Sync now"}</button>
+            <button className="btn" onClick={() => { disconnectMealcost(); say("Mealcost disconnected"); }}>Disconnect</button></div>
+        </>
+      ) : (
+        <>
+          <p className="dim small">Read your weight log from Mealcost so you only weigh in once. You need to be signed in to Mealcost with sync on. The code is read-only, covers weight only, and stays on this device.</p>
+          <ol className="small" style={{ margin: 0, paddingLeft: 20 }}><li>Open the Mealcost link page and create a code.</li><li>Paste it here.</li></ol>
+          <div className="row wrap"><a className="btn" href={LINK_PAGE} target="_blank" rel="noreferrer">Open Mealcost</a></div>
+          <div className="row"><input className="input" style={{ flex: 1 }} placeholder="Link code" aria-label="Mealcost link code" autoComplete="off" value={code} onChange={(e) => setCode(e.target.value)} />
+            <button className="btn primary" disabled={!code.trim() || mc.busy} onClick={() => connectMealcost(code).then(() => { setCode(""); say("Mealcost connected"); }).catch((e) => say(e.message))}>Connect</button></div>
+          {mc.error && <p role="alert" style={{ color: "var(--red)", margin: 0 }}>{mc.error}</p>}
+        </>
+      )}
+    </section>
+  );
+}
+
+function FormulaSettings() {
+  const { settings, setSettings } = useStore();
+  const fx = settings.fx ?? { e1rm: "epley" as E1rmKey };
+  const [custom, setCustom] = useState(fx.custom ?? "w * (1 + r / 30)");
+  const [warm, setWarm] = useState(warmText(fx.warm));
+  const patch = (p: Partial<typeof fx>) => setSettings({ fx: { ...fx, ...p } });
+  const err = fx.e1rm === "custom" ? checkFormula(custom) : null;
+  const warmOk = parseWarm(warm);
+  const text = fx.e1rm === "custom" ? custom : E1RM_TEXT[fx.e1rm];
+  const f = (() => { try { return compile(text); } catch { return null; } })();
+  return (
+    <section className="panel stack" style={{ padding: 16 }}>
+      <h3>Formulas</h3>
+      <p className="dim small">These drive every estimate: e1RM on charts and PR checks, the rep max table, strength scores and warm-ups.</p>
+      <label className="field"><span>Estimated 1RM formula</span>
+        <select className="input" value={fx.e1rm} onChange={(e) => patch({ e1rm: e.target.value as E1rmKey })}>{(Object.keys(E1RM_LABEL) as E1rmKey[]).map((k) => <option key={k} value={k}>{E1RM_LABEL[k]}{k !== "custom" ? `: ${E1RM_TEXT[k]}` : ""}</option>)}</select></label>
+      {fx.e1rm === "custom" && (
+        <label className="field"><span>Your formula. Use w for the load and r for reps. You can use + - * / ^ ( ), exp, ln, sqrt, min, max.</span>
+          <input className="input num" value={custom} spellCheck={false} onChange={(e) => { setCustom(e.target.value); if (!checkFormula(e.target.value)) patch({ custom: e.target.value }); }} />
+          {err && <span role="alert" style={{ color: "var(--red)" }}>{err}</span>}</label>
+      )}
+      {f && !err && <p className="faint xs num">Preview: 100 x 3 = {est1rm(100, 3).toFixed(1)}, 100 x 5 = {est1rm(100, 5).toFixed(1)}, 100 x 10 = {est1rm(100, 10).toFixed(1)}. The rep max table is worked backwards from the same formula.</p>}
+      <label className="row" style={{ gap: 10 }}><input type="checkbox" checked={!!fx.useRir} onChange={(e) => patch({ useRir: e.target.checked })} /><span>Add reps in reserve to the reps when estimating (a set of 5 at RIR 2 counts as 7)</span></label>
+      <label className="field"><span>Strength score</span>
+        <select className="input" value={fx.score ?? "dots"} onChange={(e) => patch({ score: e.target.value as ScoreKey })}>{(Object.keys(SCORE_LABEL) as ScoreKey[]).map((k) => <option key={k} value={k}>{SCORE_LABEL[k]}</option>)}</select></label>
+      <label className="field"><span>Warm-up sets, as percent of the first working weight x reps</span>
+        <input className="input num" value={warm} onChange={(e) => { setWarm(e.target.value); const w = parseWarm(e.target.value); if (w) patch({ warm: w }); }} />
+        {!warmOk && <span role="alert" style={{ color: "var(--red)" }}>Use the form 40%x8, 60%x5, 80%x3.</span>}</label>
+      <button className="btn" style={{ justifySelf: "start" }} onClick={() => { setSettings({ fx: undefined }); setCustom("w * (1 + r / 30)"); setWarm(warmText(DEFAULT_WARM)); }}>Reset to defaults</button>
+    </section>
+  );
+}
 
 export function More() {
   const st = useStore();
@@ -32,7 +95,7 @@ export function More() {
   };
   const exportCsv = () => {
     const rows = ["meso,week,session,date,letter,exercise,muscle,set,weight,unit,reps,myo,rir,e1rm_kg"];
-    for (const { s, d } of dated) for (const e of s.exercises) e.sets.forEach((x, i) => rows.push([s.meso, s.week, csv(s.name), d ?? "", e.letter, csv(e.exercise), csv(muscleOf(e.exercise)), i + 1, x.weight ?? "", e.unit ?? "kg", x.reps ?? "", csv(x.myo.join("+")), x.rir ?? "", x.weight && x.reps && e.unit !== "pin" ? epley(e.unit === "lb" ? x.weight * 0.45359 : x.weight, x.reps).toFixed(1) : ""].join(",")));
+    for (const { s, d } of dated) for (const e of s.exercises) e.sets.forEach((x, i) => rows.push([s.meso, s.week, csv(s.name), d ?? "", e.letter, csv(e.exercise), csv(muscleOf(e.exercise)), i + 1, x.weight ?? "", e.unit ?? "kg", x.reps ?? "", csv(x.myo.join("+")), x.rir ?? "", x.weight && x.reps && e.unit !== "pin" ? est1rm(e.unit === "lb" ? x.weight * 0.45359 : x.weight, x.reps).toFixed(1) : ""].join(",")));
     save("ledger-log.csv", rows.join("\n"), "text/csv");
   };
 
@@ -63,6 +126,10 @@ export function More() {
         <div className="field"><span>Effort scale</span><Seg full value={settings.effort ?? "rir"} onChange={(effort) => setSettings({ effort })} options={[{ v: "rir", label: "RIR" }, { v: "rpe", label: "RPE" }]} label="Effort scale" /></div>
         <div className="field"><span>Theme</span><Seg full value={settings.theme} onChange={(theme) => { setSettings({ theme }); }} options={[{ v: "auto", label: "System" }, { v: "dark", label: "Dark" }, { v: "light", label: "Light" }]} /></div>
       </section>
+
+
+      <FormulaSettings />
+      <MealcostLink />
 
       <section className="panel stack" style={{ padding: 16 }}>
         <h3>Exercise library</h3>
