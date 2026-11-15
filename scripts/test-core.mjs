@@ -6,7 +6,7 @@ import { sessionPrs } from "../src/lib/pr.ts";
 import { parseSets } from "../src/lib/sheet.ts";
 import { linkPrev, relabel, runs, muscleColor } from "../src/lib/groups.ts";
 import { sampleYear } from "../src/data/sampleYear.ts";
-import { expand } from "../src/lib/expand.ts";
+import { expand, expandLayouts } from "../src/lib/expand.ts";
 import { setFormulas, est1rm, weightForReps, checkFormula, compile, score, parseWarm } from "../src/lib/formulas.ts";
 
 let fails = 0;
@@ -130,6 +130,26 @@ for (const t of TEMPLATES) {
   const span = (new Date(dates[dates.length - 1]) - new Date(dates[0])) / 864e5;
   ok(y.sessions.length > 80 && ids.size === y.sessions.length && span > 330 && dates[dates.length - 1] <= "2026-11-15" && y.mesos.length === 11 && y.bodyweight.length > 45, `sample year ${t.id}: ${y.sessions.length} sessions over ${Math.round(span)} days`);
   ok(y.sessions.every((s) => s.exercises.every((e) => e.sets.every((x) => x.reps > 0 && (x.weight === null || x.weight > 0)))), `sample year ${t.id} sets valid`);
+}
+{
+  const t = TEMPLATES.find((x) => x.id === "ulab");
+  const g = buildSplit(t, { freq: 3, upper: 3, lower: 3 }, "mX");
+  const seq = (sp) => sp.map((r) => r.session).join(",");
+  ok(seq(g.meso.weeks[0].split) === "Upper A 1,Lower A 1,Upper B,Lower B,Upper A 2,Lower A 2,Rest", "A/B week 1: " + seq(g.meso.weeks[0].split));
+  ok(seq(g.meso.weeks[1].split) === "Upper B 1,Lower B 1,Upper A,Lower A,Upper B 2,Lower B 2,Rest", "A/B week 2: " + seq(g.meso.weeks[1].split));
+  ok(g.meso.weeks[2].split && seq(g.meso.weeks[2].split) === seq(g.meso.weeks[0].split) && g.meso.weeks[4].sessions.length === 6, "A/B rotates every two weeks");
+  const names = g.meso.weeks[0].sessions.map((s) => s.name); ok(new Set(names).size === 6, "A/B week sessions have unique names");
+}
+{
+  const D = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+  const mk = (n) => ({ name: n, items: [{ letter: "A", exercise: n + " lift", sets: 3, repLo: 8, repHi: 12, rir: 2 }] });
+  const lay = (...x) => D.map((day, i) => ({ day, session: x[i] ?? "Rest", emphasis: "" }));
+  const r = expandLayouts([mk("Ua"), mk("La")], 4, 3, 1, false, lay("Ua", "La", "Ua", "La"), lay("La", "Ua"));
+  const names = (w) => w.sessions.map((s) => s.name).join();
+  ok(names(r.weeks[0]) === "Ua 1,La 1,Ua 2,La 2" && r.weeks[0].split, "builder: repeated sessions are numbered");
+  ok(names(r.weeks[1]) === "La,Ua" && r.weeks[1].split[0].session === "La", "builder: even weeks use the second layout");
+  const plain = expandLayouts([mk("Ua"), mk("La")], 2, 3, 1, false, lay("Ua", "La"), null);
+  ok(!plain.weeks[0].split && names(plain.weeks[0]) === "Ua,La", "builder: plain week stays unchanged");
 }
 console.log(fails ? `\n${fails} failed` : "\nall passed");
 process.exit(fails ? 1 : 0);

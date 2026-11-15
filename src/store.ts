@@ -57,6 +57,7 @@ interface State {
   addExercise(sessionId: string, name: string, link?: boolean): void;
   linkExercise(sessionId: string, idx: number, link: boolean): void;
   removeExercise(name: string): void;
+  renameExercise(from: string, to: string): boolean;
   finishSession(id: string, fb: Record<string, { pump: number; workload: number }>): void;
   reopenSession(id: string): void;
   deleteSession(id: string): void;
@@ -252,6 +253,26 @@ export const useStore = create<State>((set, get) => ({
       return next;
     });
     set({ sessions });
+  },
+  /** Renames an exercise everywhere: library, every plan and every logged session. Renaming onto an existing name merges the two. */
+  renameExercise(from, to) {
+    const name = to.trim().slice(0, 80);
+    if (!name || name === from) return false;
+    const st = get();
+    const library = { ...st.library };
+    const def = library[from];
+    if (!library[name] && def) library[name] = { ...def, name, guessed: false };
+    delete library[from];
+    const mesos = st.mesos.map((m) => ({ ...m, weeks: m.weeks.map((w) => ({ ...w, sessions: w.sessions.map((x) => ({ ...x, items: x.items.map((i) => (i.exercise === from ? { ...i, exercise: name } : i)) })) })) }));
+    const sessions = st.sessions.map((x) => (x.exercises.some((e) => e.exercise === from) ? { ...x, exercises: x.exercises.map((e) => (e.exercise === from ? { ...e, exercise: name } : e)) } : x));
+    const liftMap = st.settings.liftMap && Object.fromEntries(Object.entries(st.settings.liftMap).map(([k, v]) => [k, v === from ? name : v]));
+    const settings = liftMap ? { ...st.settings, liftMap } : st.settings;
+    set({ library, mesos, sessions, settings });
+    void db.kv.put({ key: "library", value: library });
+    void db.mesos.bulkPut(mesos.filter((m, i) => JSON.stringify(m) !== JSON.stringify(st.mesos[i])).map((m) => ({ ...m, athleteId: st.settings.athleteId })));
+    void db.sessions.bulkPut(sessions.filter((x, i) => x !== st.sessions[i]));
+    if (liftMap) void db.settings.put({ ...settings, key: "main" });
+    return true;
   },
   removeExercise(name) {
     const library = { ...get().library }; delete library[name];

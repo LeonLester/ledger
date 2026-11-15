@@ -48,3 +48,9 @@ Regenerate the seed from the workbook: `SRC="/path/Training Log Leo 2026.xlsx" n
 - Exercise cells use the workbook colours: push blue, pull green, quads red, hamstrings, glutes and erectors yellow, everything else pink.
 - More, Exercise library is one scrolling table grouped by muscle. Muscle, unit and load step are editable, and exercises can be added or removed.
 - On Android the rest timer schedules a system notification, so it rings with the app in the background. Allow notifications when asked.
+
+## Rotations and A/B days
+
+- **Upper Lower A/B, 6 days** is a ready split: Upper A, Lower A, Upper B, Lower B, Upper A, Lower A, rest in week 1, then the B-first mirror in week 2, repeating through the block.
+- **Custom builder:** put the same session on several days and it becomes "Name 1", "Name 2" with the same exercises. Tick "Use a different layout on even weeks" for a two-week rotation. Each week then keeps its own weekday layout, shown and editable under Plan, Weekly split.
+- **Exercise library:** rename an exercise by tapping its name. The change applies to the library, every plan and every logged session. Renaming onto an existing name merges the two.

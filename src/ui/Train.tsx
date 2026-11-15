@@ -13,14 +13,15 @@ export function Train() {
   if (!meso) return null;
   const weeks = meso.weeks.map((w) => w.week);
   const week = settings.week;
+  const weekSplit = meso.weeks.find((w) => w.week === week)?.split ?? split;
   const planned = effectiveSessions(meso, week, adjustments, muscleOf);
   const doneIds = new Set(sessions.filter((s) => s.status === "done").map((s) => s.id));
   const activeIds = new Set(sessions.filter((s) => s.status === "active").map((s) => s.id));
   const today = new Date().toLocaleDateString("en-US", { weekday: "long" });
-  const todaySess = split.find((s) => s.day === today)?.session;
+  const todaySess = weekSplit.find((s) => s.day === today)?.session;
   const todayName = planned.find((p) => p.name === todaySess || (todaySess === "Legs 1" && p.name === "Lower 1") || (todaySess === "Legs 2" && p.name === "Lower 2") || (!!todaySess && p.name.startsWith(todaySess + " ")))?.name;
   const suggestions = feedback.filter((f) => f.state === "pending" && f.delta != null && f.delta !== 0);
-  const emph = (n: string) => split.find((s) => s.session === n || (n.startsWith("Lower") && s.session === n.replace("Lower", "Legs")))?.emphasis;
+  const emph = (n: string) => weekSplit.find((s) => s.session === n || (n.startsWith("Lower") && s.session === n.replace("Lower", "Legs")))?.emphasis;
 
   return (
     <div className="stack-lg">

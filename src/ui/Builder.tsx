@@ -3,7 +3,7 @@ import { ArrowDown, ArrowUp, Link2, Plus, Trash2, Unlink2 } from "lucide-react";
 import { linkPrev, muscleColor, prefix, runs } from "../lib/groups";
 import { useStore } from "../store";
 import { buildSplit, TEMPLATES, WEEKDAYS, type Generated, type SplitRow } from "../data/templates";
-import { expand, relabel } from "../lib/expand";
+import { expand, expandLayouts, relabel } from "../lib/expand";
 import type { Meso, PlanItem, PlanSession } from "../types";
 
 const REST = "Rest";
@@ -105,6 +105,8 @@ export function ProgramBuilder({ onSave, saveLabel = "Save program", onCancel, i
   const [deload, setDeload] = useState(true);
   const [sessions, setSessions] = useState<PlanSession[]>(initial?.sessions ?? [{ name: "Day 1", items: [blank()] }]);
   const [split, setSplit] = useState<SplitRow[] | null>(null);
+  const [splitB, setSplitB] = useState<SplitRow[] | null>(null);
+  const [rotate, setRotate] = useState(false);
   const days = useMemo(() => split ?? evenSplit(sessions.map((s) => s.name)), [split, sessions]);
   const valid = name.trim() && sessions.length > 0 && sessions.every((s) => s.name.trim() && s.items.some((i) => i.exercise.trim())) && new Set(sessions.map((s) => s.name.trim())).size === sessions.length;
   const fromTemplate = (id: string) => {
@@ -116,8 +118,10 @@ export function ProgramBuilder({ onSave, saveLabel = "Save program", onCancel, i
   };
   const submit = () => {
     const clean = sessions.map((s) => ({ ...s, name: s.name.trim() }));
-    const sp = days.map((r) => ({ ...r, session: clean.some((s) => s.name === r.session.trim()) ? r.session.trim() : REST }));
-    return onSave((id): Generated => ({ meso: { id, name: name.trim(), weeks: expand(clean, weeks, rirStart, rirEnd, deload) }, split: sp, mode: "feedback", effort: "rir" }));
+    const fix = (rows: SplitRow[]) => rows.map((r) => ({ ...r, session: clean.some((s) => s.name === r.session.trim()) ? r.session.trim() : REST }));
+    const second = rotate ? fix(splitB ?? days) : null;
+    const g = expandLayouts(clean, weeks, rirStart, rirEnd, deload, fix(days), second);
+    return onSave((id): Generated => ({ meso: { id, name: name.trim(), weeks: g.weeks }, split: g.split, mode: "feedback", effort: "rir" }));
   };
   return (
     <div className="stack-lg">
@@ -127,7 +131,10 @@ export function ProgramBuilder({ onSave, saveLabel = "Save program", onCancel, i
       <h3>Sessions</h3>
       <SessionsEditor sessions={sessions} onChange={setSessions} />
       <h3>Weekly layout</h3>
+      <p className="dim small">Put the same session on more than one day to repeat it, for example Upper A, Lower A, Upper B, Lower B, Upper A, Lower A.</p>
       <SplitEditor split={days} sessions={sessions.map((s) => s.name.trim())} onChange={setSplit} />
+      <label className="row" style={{ gap: 10 }}><input type="checkbox" checked={rotate} onChange={(e) => { setRotate(e.target.checked); if (e.target.checked && !splitB) setSplitB(days); }} /><span className="small">Use a different layout on even weeks (a two week rotation)</span></label>
+      {rotate && <><h3>Even weeks</h3><SplitEditor split={splitB ?? days} sessions={sessions.map((s) => s.name.trim())} onChange={setSplitB} /></>}
       <h3>Block</h3>
       <div className="row wrap" style={{ gap: 28 }}>
         <Stepper label="Weeks" value={weeks} min={1} max={16} onChange={setWeeks} />

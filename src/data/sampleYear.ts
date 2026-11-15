@@ -44,7 +44,7 @@ export function sampleYear(t: Template, today = new Date()): Year {
       const gw = b * 5 + (wk.week - 1);
       if (gw > 51) continue;
       for (const s of wk.sessions) {
-        const row = g.split.find((x) => x.session === s.name);
+        const row = (wk.split ?? g.split).find((x) => x.session === s.name);
         const date = iso(addDays(start, gw * 7 + (row ? WEEKDAYS.indexOf(row.day) : 0)));
         if (date > todayIso || r() < 0.04) continue; // future, or a missed session
         const exs: ExLog[] = s.items.map((it) => {

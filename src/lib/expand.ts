@@ -12,3 +12,35 @@ export function expand(base: PlanSession[], weeks: number, rirStart: number, rir
   });
 }
 
+
+export interface Row { day: string; session: string; emphasis: string }
+const REST = "Rest";
+
+/** Like expand, but the weekday layout drives the week: a session placed on several days becomes "Name 1", "Name 2" with the same
+ *  exercises, and an optional second layout is used on even weeks (a two week rotation such as A/B days one after another). */
+export function expandLayouts(base: PlanSession[], weeks: number, rirStart: number, rirEnd: number, deload: boolean, a: Row[], b: Row[] | null):
+  { weeks: { week: number; sessions: PlanSession[]; split?: Row[] }[]; split: Row[] } {
+  const flat = expand(base, weeks, rirStart, rirEnd, deload);
+  const rotating = !!b;
+  const build = (layout: Row[], w: (typeof flat)[number]) => {
+    const rows = layout.filter((r) => r.session !== REST && w.sessions.some((s) => s.name === r.session.trim()));
+    const total: Record<string, number> = {}; for (const r of rows) total[r.session.trim()] = (total[r.session.trim()] ?? 0) + 1;
+    const seen: Record<string, number> = {};
+    const named = new Map<Row, string>(); const sessions: PlanSession[] = [];
+    for (const r of rows) {
+      const n = r.session.trim(); const idx = (seen[n] = (seen[n] ?? 0) + 1);
+      const name = total[n] > 1 ? `${n} ${idx}` : n;
+      named.set(r, name);
+      sessions.push({ name, items: w.sessions.find((s) => s.name === n)!.items.map((it) => ({ ...it })) });
+    }
+    const split = layout.map((r) => (named.has(r) ? { ...r, session: named.get(r)! } : { ...r, session: REST }));
+    const repeats = Object.values(total).some((c) => c > 1);
+    return { sessions, split, repeats };
+  };
+  const out = flat.map((w) => {
+    const L = build(rotating && w.week % 2 === 0 ? b! : a, w);
+    return { week: w.week, sessions: L.sessions, ...(rotating || L.repeats ? { split: L.split } : {}) };
+  });
+  const first = build(a, flat[0]);
+  return { weeks: out, split: first.split };
+}

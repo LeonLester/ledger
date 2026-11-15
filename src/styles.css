@@ -230,3 +230,5 @@ select.lib-in { width: 58px; }
 /* keep action rows on one line */
 .addset .btn { white-space: nowrap; padding: 0 8px; font-size: .8rem; gap: 4px; }
 .set .prev { font-size: .74rem; }
+.lib-name { width: 112px; font-weight: 600; }
+.lib-n { display: flex; align-items: center; }

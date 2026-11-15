@@ -7,7 +7,7 @@ import type { ExerciseDef, Unit } from "../types";
 
 /** The exercise library as one scrolling table, grouped by the muscle each exercise trains. Every field is editable. */
 export function Library() {
-  const { library, setExercise, removeExercise, say } = useStore();
+  const { library, setExercise, removeExercise, renameExercise, say } = useStore();
   const [q, setQ] = useState("");
   const [muscle, setMuscle] = useState("all");
   const [adding, setAdding] = useState(false);
@@ -58,7 +58,9 @@ export function Library() {
               <tr key={`h-${m}`} className="lib-h" style={{ "--mc": muscleColor(m) } as CSSProperties}><td colSpan={5}><b>{m}</b> <span className="faint xs">{list.length}</span></td></tr>,
               ...list.map((d) => (
                 <tr key={d.name} style={{ "--mc": muscleColor(d.muscle) } as CSSProperties}>
-                  <td className="lib-n" title={d.name}>{d.name}{d.guessed && <span className="pill warn" style={{ marginLeft: 6 }}>?</span>}</td>
+                  <td className="lib-n"><input className="lib-in lib-name" aria-label={`Rename ${d.name}`} defaultValue={d.name} key={d.name}
+                    onBlur={(e) => { const v = e.target.value.trim(); if (!v || v === d.name) { e.target.value = d.name; return; } if (library[v] && !confirm(`${v} already exists. Merge ${d.name} into it? Plans and logs are moved over.`)) { e.target.value = d.name; return; } if (renameExercise(d.name, v)) say(`Renamed to ${v}`); }}
+                    onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()} />{d.guessed && <span className="pill warn" style={{ marginLeft: 2 }}>?</span>}</td>
                   <td><input className="lib-in" list="lib-muscles" aria-label={`${d.name} muscle`} defaultValue={d.muscle} onBlur={(e) => e.target.value.trim() && e.target.value !== d.muscle && setExercise(d.name, { muscle: e.target.value.trim() })} /></td>
                   <td><select className="lib-in" aria-label={`${d.name} unit`} value={d.unit} onChange={(e) => setExercise(d.name, { unit: e.target.value as Unit })}><option>kg</option><option>lb</option><option>pin</option></select></td>
                   <td><input className="lib-in num" style={{ width: 56 }} inputMode="decimal" aria-label={`${d.name} load step`} defaultValue={d.increment} onBlur={(e) => setExercise(d.name, { increment: Number(e.target.value.replace(",", ".")) || d.increment })} /></td>
@@ -70,7 +72,7 @@ export function Library() {
         </table>
         {count === 0 && <p className="dim small" style={{ padding: 14 }}>No exercises match.</p>}
       </div>
-      <p className="faint xs">{count} exercises. Edit a muscle to move an exercise to another group; type a new name to start a group. Step is how much the app adds once you hit the top of the rep range. Rows marked ? still have a guessed muscle.</p>
+      <p className="faint xs">{count} exercises. Tap a name to rename it everywhere, including past logs. Edit a muscle to move an exercise to another group; type a new name to start a group. Step is how much the app adds once you hit the top of the rep range. Rows marked ? still have a guessed muscle.</p>
     </section>
   );
 }

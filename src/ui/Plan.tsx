@@ -12,7 +12,7 @@ import { CoachInbox } from "./CoachInbox";
 import type { SplitRow } from "../data/templates";
 
 export function Plan() {
-  const { mesos, settings, adjustments, muscleOf, setSettings, feedback, split, saveSplit, say } = useStore();
+  const { mesos, settings, adjustments, muscleOf, setSettings, feedback, split: globalSplit, saveSplit, saveMeso, say } = useStore();
   const [view, setView] = useState<"plan" | "sheet">("plan");
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<SplitRow[] | null>(null);
@@ -25,6 +25,8 @@ export function Plan() {
   if (!meso) return null;
   if (editing) return <div className="stack-lg"><div className="page-head"><div><h1>Edit sessions</h1><p className="sub">{meso.name}</p></div></div><MesoEditor meso={meso} week={week} onClose={() => setEditing(false)} /></div>;
   const base = meso.weeks.find((w) => w.week === week);
+  const own = base?.split;
+  const split = own ?? globalSplit;
   const eff = effectiveSessions(meso, week, adjustments, muscleOf);
   const ledger = adjustments.filter((a) => a.meso === mesoId).sort((a, b) => a.week - b.week);
   return (
@@ -66,8 +68,8 @@ export function Plan() {
       </section>}
 
       {view === "plan" && <section className="panel stack" style={{ padding: 16 }}>
-        <div className="row between"><h3>Weekly split</h3>
-          {draft ? <div className="row"><button className="btn sm ghost" onClick={() => setDraft(null)}>Cancel</button><button className="btn sm primary" onClick={() => { saveSplit(draft); setDraft(null); say("Weekly split saved"); }}>Save</button></div>
+        <div className="row between"><h3>Weekly split{own ? `, week ${week}` : ""}</h3>
+          {draft ? <div className="row"><button className="btn sm ghost" onClick={() => setDraft(null)}>Cancel</button><button className="btn sm primary" onClick={() => { if (own) saveMeso({ ...meso, weeks: meso.weeks.map((w) => (w.week === week ? { ...w, split: draft } : w)) }); else saveSplit(draft); setDraft(null); say("Weekly split saved"); }}>Save</button></div>
             : <button className="btn sm" onClick={() => setDraft(split.length ? split : [])}>Edit week</button>}</div>
         {draft ? <SplitEditor split={draft} sessions={eff.map((s) => s.name)} onChange={setDraft} />
           : <table className="t"><tbody>{split.map((d) => <tr key={d.day}><td>{d.day}</td><td><b>{d.session}</b></td><td className="dim">{d.emphasis}</td></tr>)}</tbody></table>}

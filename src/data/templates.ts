@@ -1,4 +1,4 @@
-import type { Meso, PlanItem, PlanSession } from "../types";
+import type { Meso, PlanItem, PlanSession, PlanWeek } from "../types";
 import { POOL } from "./catalog";
 
 export interface SplitRow { day: string; session: string; emphasis: string }
@@ -24,6 +24,10 @@ const DAYS: Record<string, { note: string; slots: Slot[] }> = {
   "Lower Power": { note: "Heavy lower", slots: [["squat", 4, 3, 5], ["hinge", 3, 5, 8], ["quad+1", 3, 8, 12], ["ham", 3, 6, 10], ["calf", 3, 6, 10]] },
   "Upper Hyp": { note: "Upper volume", slots: [["chest+1", 4, 8, 12], ["vpull+1", 4, 8, 12], ["press+1", 3, 8, 12], ["hpull+2", 3, 10, 14], ["lateral", 3, 12, 20], ["biceps+1", 3, 10, 14], ["triceps+1", 3, 10, 14]] },
   "Lower Hyp": { note: "Lower volume", slots: [["squat+1", 4, 8, 12], ["hinge+1", 3, 8, 12], ["quad+2", 3, 10, 15], ["ham+1", 3, 10, 15], ["glute", 3, 8, 12], ["calf+1", 4, 10, 15]] },
+  "Upper A": { note: "Upper, chest and vertical pull first", slots: [["chest", 3, 6, 10], ["vpull", 3, 8, 12], ["press", 3, 8, 12], ["hpull", 3, 8, 12], ["lateral", 2, 12, 20], ["biceps", 2, 10, 14], ["triceps", 2, 10, 14]] },
+  "Upper B": { note: "Upper, row and press variations", slots: [["hpull+1", 3, 6, 10], ["chest+1", 3, 8, 12], ["vpull+1", 3, 8, 12], ["press+1", 3, 8, 12], ["rear", 2, 12, 20], ["biceps+1", 2, 10, 14], ["triceps+1", 2, 10, 14]] },
+  "Lower A": { note: "Lower, squat first", slots: [["squat", 3, 6, 10], ["hinge", 3, 8, 12], ["quad+1", 2, 10, 15], ["ham", 3, 10, 15], ["calf", 3, 10, 15], ["abs", 2, 10, 15]] },
+  "Lower B": { note: "Lower, hinge first", slots: [["hinge+1", 3, 6, 10], ["squat+1", 3, 8, 12], ["glute", 3, 8, 12], ["ham+1", 3, 10, 15], ["calf+1", 3, 10, 15], ["quad+2", 2, 10, 15]] },
   Anterior: { note: "Quads, chest, shoulders, triceps", slots: [["squat", 3, 6, 10], ["quad+1", 3, 10, 15], ["chest", 3, 6, 10], ["press", 3, 8, 12], ["lateral", 3, 12, 20], ["triceps", 3, 10, 15]] },
   Posterior: { note: "Hamstrings, glutes, back, biceps", slots: [["hinge", 3, 6, 10], ["ham", 3, 10, 15], ["glute", 3, 8, 12], ["vpull", 3, 8, 12], ["hpull", 3, 8, 12], ["rear", 3, 12, 20], ["biceps", 3, 8, 12]] },
 };
@@ -36,6 +40,8 @@ export interface Template {
   id: string; name: string; blurb: string; sessions: number; opts?: "freq" | "ul";
   /** one entry per weekday slot; "Rest" for off days. Without rest entries the sessions are spread over the week. */
   cycle: (o: Opts) => string[];
+  /** a second week layout. Odd weeks use cycle, even weeks use cycle2, so a block can rotate over two weeks. */
+  cycle2?: (o: Opts) => string[];
 }
 
 /** upper and lower days interleaved so the same kind never runs back to back where it can be avoided */
@@ -51,6 +57,8 @@ const R = "Rest";
 export const TEMPLATES: Template[] = [
   { id: "full", name: "Full body", blurb: "Every muscle every session. Choose 2 to 6 sessions per week.", sessions: 3, opts: "freq", cycle: (o) => Array(o.freq).fill("Full") },
   { id: "ul-x-y", name: "Upper / Lower, any X and Y", blurb: "Pick the number of upper and lower sessions, for example 3 upper and 2 lower.", sessions: 4, opts: "ul", cycle: (o) => interleave(o.upper, o.lower) },
+  { id: "ulab", name: "Upper Lower A/B, 6 days", blurb: "Three upper and three lower a week, alternating A and B sessions one after another over a two week rotation.", sessions: 6,
+    cycle: () => ["Upper A", "Lower A", "Upper B", "Lower B", "Upper A", "Lower A", R], cycle2: () => ["Upper B", "Lower B", "Upper A", "Lower A", "Upper B", "Lower B", R] },
   { id: "ul4", name: "Upper Lower, 4 days", blurb: "Upper, lower, rest, upper, lower. Each muscle twice a week.", sessions: 4, cycle: () => ["Upper", "Lower", R, "Upper", "Lower", R, R] },
   { id: "ulf", name: "Upper Lower Full, 3 days", blurb: "Three days a week for people short on time.", sessions: 3, cycle: () => ["Upper", R, "Lower", R, "Full", R, R] },
   { id: "ppl3", name: "Push Pull Legs, 3 days", blurb: "One round of PPL a week.", sessions: 3, cycle: () => ["Push", "Pull", "Legs", R, R, R, R] },
@@ -79,34 +87,41 @@ const setsFor = (base: number, week: number, scale: number) => {
 };
 
 export function buildSplit(t: Template, o: Opts, mesoId: string): Generated {
-  const cycle = t.cycle(o);
-  const hasRest = cycle.includes(R);
-  const kinds = cycle.filter((c) => c !== R);
-  const n = kinds.length;
-  const scale = n >= 5 ? 0.75 : n === 4 ? 0.9 : 1;
-  const total: Record<string, number> = {};
-  for (const k of kinds) total[k] = (total[k] ?? 0) + 1;
-  const seen: Record<string, number> = {};
-  const sessions = kinds.map((k) => {
-    const idx = seen[k] = (seen[k] ?? 0) + 1;
-    return { kind: k, name: total[k] > 1 ? `${k} ${idx}` : k, occ: idx - 1 };
-  });
-  const weeks = [1, 2, 3, 4, 5].map((week) => ({
-    week,
-    sessions: sessions.map<PlanSession>((s) => ({
-      name: s.name,
-      items: DAYS[s.kind].slots.map<PlanItem>(([pk, sets, lo, hi], i) => ({
-        letter: `${String.fromCharCode(65 + i)}1`, exercise: pick(pk, s.occ), sets: setsFor(sets, week, scale), repLo: lo, repHi: hi, rir: RIR[week - 1],
+  /** sessions and weekday layout for one week's cycle */
+  const layout = (cycle: string[]) => {
+    const hasRest = cycle.includes(R);
+    const kinds = cycle.filter((c) => c !== R);
+    const n = kinds.length;
+    const total: Record<string, number> = {};
+    for (const k of kinds) total[k] = (total[k] ?? 0) + 1;
+    const seen: Record<string, number> = {};
+    const sessions = kinds.map((k) => {
+      const idx = seen[k] = (seen[k] ?? 0) + 1;
+      return { kind: k, name: total[k] > 1 ? `${k} ${idx}` : k, occ: idx - 1 };
+    });
+    const slots = hasRest ? cycle : SPREAD[Math.min(7, n)].reduce<string[]>((acc, d, i) => { acc[d] = kinds[i]; return acc; }, Array(7).fill(R));
+    let k = 0;
+    const split: SplitRow[] = WEEKDAYS.map((day, i) => {
+      const kind = slots[i] ?? R;
+      if (kind === R) return { day, session: R, emphasis: "" };
+      const s = sessions[k++];
+      return { day, session: s.name, emphasis: DAYS[kind].note };
+    });
+    return { sessions, split, scale: n >= 5 ? 0.75 : n === 4 ? 0.9 : 1 };
+  };
+  const one = layout(t.cycle(o)), two = t.cycle2 ? layout(t.cycle2(o)) : null;
+  const weeks: PlanWeek[] = [1, 2, 3, 4, 5].map((week) => {
+    const L = two && week % 2 === 0 ? two : one;
+    return {
+      week,
+      sessions: L.sessions.map<PlanSession>((s) => ({
+        name: s.name,
+        items: DAYS[s.kind].slots.map<PlanItem>(([pk, sets, lo, hi], i) => ({
+          letter: `${String.fromCharCode(65 + i)}1`, exercise: pick(pk, s.occ), sets: setsFor(sets, week, L.scale), repLo: lo, repHi: hi, rir: RIR[week - 1],
+        })),
       })),
-    })),
-  }));
-  const slots = hasRest ? cycle : SPREAD[Math.min(7, n)].reduce<string[]>((acc, d, i) => { acc[d] = kinds[i]; return acc; }, Array(7).fill(R));
-  let k = 0;
-  const split: SplitRow[] = WEEKDAYS.map((day, i) => {
-    const kind = slots[i] ?? R;
-    if (kind === R) return { day, session: R, emphasis: "" };
-    const s = sessions[k++];
-    return { day, session: s.name, emphasis: DAYS[kind].note };
+      ...(two ? { split: L.split } : {}),
+    };
   });
-  return { meso: { id: mesoId, name: t.id === "ul-x-y" ? `Upper ${o.upper} Lower ${o.lower}` : t.id === "full" ? `Full body ${o.freq}x` : t.name, weeks }, split, mode: "feedback", effort: "rir" };
+  return { meso: { id: mesoId, name: t.id === "ul-x-y" ? `Upper ${o.upper} Lower ${o.lower}` : t.id === "full" ? `Full body ${o.freq}x` : t.name, weeks }, split: one.split, mode: "feedback", effort: "rir" };
 }
