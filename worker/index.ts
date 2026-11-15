@@ -45,6 +45,8 @@ const SCHEMA = [
   "CREATE INDEX IF NOT EXISTS asg_client ON assignments (client_id)",
   "CREATE TABLE IF NOT EXISTS comments (id TEXT PRIMARY KEY, coach_id TEXT NOT NULL, client_id TEXT NOT NULL, session_id TEXT, body TEXT NOT NULL, created INTEGER NOT NULL)",
   "CREATE INDEX IF NOT EXISTS cmt_client ON comments (client_id, created)",
+  "CREATE TABLE IF NOT EXISTS invites (id TEXT PRIMARY KEY, token TEXT NOT NULL UNIQUE, role TEXT NOT NULL, email TEXT, note TEXT, created_by TEXT NOT NULL, created INTEGER NOT NULL, expires INTEGER NOT NULL, used_by TEXT, used INTEGER)",
+  "CREATE TABLE IF NOT EXISTS coach_requests (user_id TEXT PRIMARY KEY, note TEXT, created INTEGER NOT NULL)",
   "CREATE TABLE IF NOT EXISTS rl (k TEXT NOT NULL, w INTEGER NOT NULL, n INTEGER NOT NULL, exp INTEGER NOT NULL, PRIMARY KEY (k, w))",
 ];
 let ready: Promise<unknown> | null = null;
@@ -63,8 +65,11 @@ async function limited(db: D1Database, key: string, limit: number, windowSec: nu
 }
 const ipOf = (req: Request) => req.headers.get("cf-connecting-ip") ?? "";
 
-interface User { id: string; email: string; name: string; role: "athlete" | "coach"; coach_id: string | null; invite: string | null }
-const pub = (u: User, coachName?: string | null) => ({ id: u.id, email: u.email, name: u.name, role: u.role, coachId: u.coach_id, coachName: coachName ?? null, invite: u.role === "coach" ? u.invite : null });
+interface User { id: string; email: string; name: string; role: "athlete" | "coach"; coach_id: string | null; invite: string | null; google_sub?: string | null }
+/** Admins are listed by email in the ADMIN_EMAILS secret. Only a Google-verified sign-in counts, so nobody can claim an admin address by signing up with it. */
+let ADMINS: string[] = [];
+const isAdmin = (u: User) => !!u.google_sub && ADMINS.includes(u.email.toLowerCase());
+const pub = (u: User, coachName?: string | null) => ({ id: u.id, email: u.email, name: u.name, role: u.role, coachId: u.coach_id, coachName: coachName ?? null, invite: u.role === "coach" ? u.invite : null, admin: isAdmin(u) });
 
 async function newToken(db: D1Database, userId: string) {
   const t = b64(rand(32));
@@ -90,22 +95,39 @@ async function handle(req: Request, env: Env): Promise<Response> {
   if (req.method === "OPTIONS") return new Response(null, { status: 204 });
   const db = env.DB;
   await ensure(db);
+  ADMINS = (env.ADMIN_EMAILS ?? "").toLowerCase().split(",").map((x) => x.trim()).filter(Boolean);
   const ip = ipOf(req); // empty on local dev, where address limits are skipped
   if (ip && (await limited(db, `api:${ip}`, 300, 60))) return tooMany(60);
   const body = async <T,>() => (await req.json().catch(() => ({}))) as T;
 
   if (path === "/api/config") return json({ google: !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET) });
 
+
+  /** An unused, unexpired invite for this token, or null. */
+  const findInvite = (t: unknown) => (typeof t === "string" && t.length >= 16 && t.length <= 64
+    ? db.prepare("SELECT * FROM invites WHERE token = ? AND used IS NULL AND expires > ?").bind(t, Date.now()).first<{ id: string; role: string; email: string | null; note: string | null }>() : Promise.resolve(null));
+  if (path === "/api/invite/check" && req.method === "GET") {
+    if (ip && (await limited(db, `ichk:${ip}`, 60, 600))) return tooMany(600);
+    const inv = await findInvite(url.searchParams.get("t"));
+    return json(inv ? { valid: true, role: inv.role, email: inv.email, note: inv.note } : { valid: false });
+  }
+
   if (path === "/api/signup" && req.method === "POST") {
     if (ip && (await limited(db, `signup:${ip}`, 10, 3600))) return tooMany(3600);
-    const b = await body<{ email: string; password: string; name: string; code?: string; coachKey?: string }>();
+    const b = await body<{ email: string; password: string; name: string; code?: string; coachKey?: string; invite?: string }>();
     const email = clean(b.email, 200).toLowerCase(), name = clean(b.name, 80);
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return fail(400, "Enter a valid email address.");
     if (typeof b.password !== "string" || b.password.length < 8) return fail(400, "Use a password of at least 8 characters.");
     if (b.password.length > 200) return fail(400, "That password is too long.");
     if (!name) return fail(400, "Enter your name.");
-    let role: "athlete" | "coach" = "athlete", coach: string | null = null;
-    if (b.coachKey) {
+    let role: "athlete" | "coach" = "athlete", coach: string | null = null, inviteId: string | null = null;
+    if (b.invite) {
+      const inv = await findInvite(b.invite);
+      if (!inv) return fail(400, "That invite link has expired or was already used. Ask for a new one.");
+      if (inv.email && inv.email.toLowerCase() !== email) return fail(400, `This invite is for ${inv.email}. Use that address.`);
+      if (inv.role === "coach") role = "coach";
+      inviteId = inv.id;
+    } else if (b.coachKey) {
       if (!env.COACH_KEY || !safeEq(b.coachKey, env.COACH_KEY)) return fail(403, "That coach key is not valid.");
       role = "coach";
     } else if (b.code) {
@@ -117,6 +139,7 @@ async function handle(req: Request, env: Env): Promise<Response> {
     const uid = id(), salt = rand(16);
     await db.prepare("INSERT INTO users (id,email,name,salt,hash,role,coach_id,invite,created) VALUES (?,?,?,?,?,?,?,?,?)")
       .bind(uid, email, name, b64(salt), await hashPw(b.password, salt), role, coach, role === "coach" ? code() : null, Date.now()).run();
+    if (inviteId) await db.prepare("UPDATE invites SET used_by = ?, used = ? WHERE id = ?").bind(uid, Date.now(), inviteId).run();
     const u = (await db.prepare("SELECT * FROM users WHERE id = ?").bind(uid).first<User>())!;
     return json({ token: await newToken(db, uid), user: pub(u, await coachName(db, u.coach_id)) });
   }
@@ -148,10 +171,10 @@ async function handle(req: Request, env: Env): Promise<Response> {
       client_id: env.GOOGLE_CLIENT_ID, redirect_uri: `${origin}/api/google/callback`, response_type: "code", scope: "openid email profile",
       state, code_challenge: b64(new Uint8Array(await crypto.subtle.digest("SHA-256", enc.encode(verifier)))), code_challenge_method: "S256", prompt: "select_account",
     });
-    return new Response(null, { status: 302, headers: { location: `https://accounts.google.com/o/oauth2/v2/auth?${q}`, "set-cookie": cookie(`${state}.${verifier}.${challenge}.${url.searchParams.get("app") === "1" ? "1" : "0"}.${coachCode}`, 600), "cache-control": "no-store" } });
+    return new Response(null, { status: 302, headers: { location: `https://accounts.google.com/o/oauth2/v2/auth?${q}`, "set-cookie": cookie(`${state}.${verifier}.${challenge}.${url.searchParams.get("app") === "1" ? "1" : "0"}.${coachCode}.${clean(url.searchParams.get("inv"), 64).replace(/[^\w-]/g, "")}`, 600), "cache-control": "no-store" } });
   }
   if (path === "/api/google/callback" && req.method === "GET") {
-    const [state, verifier, challenge, app, coachCode] = cookieVal().split(".");
+    const [state, verifier, challenge, app, coachCode, invTok] = cookieVal().split(".");
     const back = (why: string) => (app === "1"
       ? new Response(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ledger</title><body style="font:18px system-ui;padding:32px 20px"><p>Google sign-in did not finish (${why}). Go back to Ledger and try again.</p>`, { status: 400, headers: { "content-type": "text/html; charset=utf-8", "set-cookie": cookie("", 0) } })
       : new Response(null, { status: 302, headers: { location: `/?signin=${why}`, "set-cookie": cookie("", 0) } }));
@@ -171,6 +194,8 @@ async function handle(req: Request, env: Env): Promise<Response> {
     const verified = claims.email_verified === true || claims.email_verified === "true";
     if (!["https://accounts.google.com", "accounts.google.com"].includes(String(claims.iss)) || claims.aud !== env.GOOGLE_CLIENT_ID || !claims.sub || !claims.email || !verified || (claims.exp ?? 0) * 1000 < Date.now()) return back("claims");
     const email = claims.email.toLowerCase();
+    const inv = invTok ? await findInvite(invTok) : null;
+    const invOk = !!inv && (!inv.email || inv.email.toLowerCase() === email);
     let u = await db.prepare("SELECT * FROM users WHERE google_sub = ?").bind(claims.sub).first<User>();
     if (!u) {
       const byMail = await db.prepare("SELECT * FROM users WHERE email = ?").bind(email).first<User>();
@@ -179,10 +204,12 @@ async function handle(req: Request, env: Env): Promise<Response> {
         const c = coachCode ? await db.prepare("SELECT id FROM users WHERE invite = ? AND role = 'coach'").bind(coachCode).first<{ id: string }>() : null;
         const uid = id();
         await db.prepare("INSERT INTO users (id,email,name,salt,hash,role,coach_id,invite,created,google_sub) VALUES (?,?,?,?,?,?,?,?,?,?)")
-          .bind(uid, email, clean(claims.name, 80) || email.split("@")[0], "", "", "athlete", c?.id ?? null, null, Date.now(), claims.sub).run();
+          .bind(uid, email, clean(claims.name, 80) || email.split("@")[0], "", "", invOk && inv!.role === "coach" ? "coach" : "athlete", c?.id ?? null, invOk && inv!.role === "coach" ? code() : null, Date.now(), claims.sub).run();
         u = (await db.prepare("SELECT * FROM users WHERE id = ?").bind(uid).first<User>())!;
       }
     }
+    if (invOk && inv!.role === "coach" && u.role !== "coach") { await db.prepare("UPDATE users SET role = 'coach', invite = COALESCE(invite, ?) WHERE id = ?").bind(code(), u.id).run(); }
+    if (invOk) await db.prepare("UPDATE invites SET used_by = ?, used = ? WHERE id = ?").bind(u.id, Date.now(), inv!.id).run();
     const once = b64(rand(32));
     await db.prepare("INSERT INTO tokens (hash, user_id, expires) VALUES (?,?,?)").bind(await sha(`xc:${once}:${challenge}`), u.id, Date.now() + 120000).run();
     if (app === "1") {
@@ -222,8 +249,61 @@ async function handle(req: Request, env: Env): Promise<Response> {
     await db.prepare("UPDATE users SET coach_id = ? WHERE id = ?").bind(c.id, me.id).run();
     return json({ user: pub({ ...me, coach_id: c.id }, c.name) });
   }
+  /* ---- Coach access requests (any athlete) ---- */
+  if (path === "/api/coach-request" && req.method === "POST") {
+    if (me.role === "coach") return fail(400, "You are already a coach.");
+    const b = await body<{ note?: string }>();
+    await db.prepare("INSERT INTO coach_requests (user_id, note, created) VALUES (?,?,?) ON CONFLICT(user_id) DO UPDATE SET note = excluded.note, created = excluded.created").bind(me.id, clean(b.note, 300), Date.now()).run();
+    return json({ ok: true });
+  }
+  if (path === "/api/coach-request" && req.method === "GET") {
+    return json({ pending: !!(await db.prepare("SELECT 1 FROM coach_requests WHERE user_id = ?").bind(me.id).first()) });
+  }
+
+  /* ---- Admin: who signed up, coach approvals and invite links ---- */
+  if (path.startsWith("/api/admin/")) {
+    if (!isAdmin(me)) return fail(403, "Admins only.");
+    if (path === "/api/admin/overview" && req.method === "GET") {
+      const users = (await db.prepare(`SELECT u.id, u.name, u.email, u.role, u.created, u.google_sub IS NOT NULL AS google, u.hash != '' AS password, c.name AS coach,
+        (SELECT MAX(updated) FROM docs d WHERE d.user_id = u.id) AS last,
+        (SELECT COUNT(*) FROM users k WHERE k.coach_id = u.id) AS clients
+        FROM users u LEFT JOIN users c ON c.id = u.coach_id ORDER BY u.created DESC LIMIT 1000`).all<Record<string, unknown>>()).results;
+      const requests = (await db.prepare("SELECT r.user_id AS id, u.name, u.email, r.note, r.created FROM coach_requests r JOIN users u ON u.id = r.user_id ORDER BY r.created").all()).results;
+      const invites = (await db.prepare("SELECT i.id, i.token, i.role, i.email, i.note, i.created, i.expires, i.used, u.name AS usedBy FROM invites i LEFT JOIN users u ON u.id = i.used_by ORDER BY i.created DESC LIMIT 200").all()).results;
+      const week = Date.now() - 7 * 864e5;
+      return json({ stats: { users: users.length, coaches: users.filter((u) => u.role === "coach").length, week: users.filter((u) => Number(u.created) > week).length }, users, requests, invites });
+    }
+    const b = await body<{ id?: string; userId?: string; approve?: boolean; role?: string; email?: string; note?: string; days?: number; kind?: string }>();
+    if (path === "/api/admin/invite" && req.method === "POST") {
+      const email = clean(b.email, 200).toLowerCase();
+      if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return fail(400, "That email address is not valid.");
+      const token = b64(rand(24)), days = Math.min(60, Math.max(1, Number(b.days) || 14));
+      await db.prepare("INSERT INTO invites (id,token,role,email,note,created_by,created,expires) VALUES (?,?,?,?,?,?,?,?)").bind(id(), token, "coach", email || null, clean(b.note, 120) || null, me.id, Date.now(), Date.now() + days * 864e5).run();
+      return json({ token });
+    }
+    if (path === "/api/admin/invite" && req.method === "DELETE") {
+      await db.prepare("DELETE FROM invites WHERE id = ?").bind(String(b.id ?? "")).run();
+      return json({ ok: true });
+    }
+    if (path === "/api/admin/request" && req.method === "POST") {
+      const uid = String(b.userId ?? "");
+      if (b.approve) await db.prepare("UPDATE users SET role = 'coach', invite = COALESCE(invite, ?) WHERE id = ?").bind(code(), uid).run();
+      await db.prepare("DELETE FROM coach_requests WHERE user_id = ?").bind(uid).run();
+      return json({ ok: true });
+    }
+    if (path === "/api/admin/role" && req.method === "POST") {
+      const uid = String(b.userId ?? "");
+      if (uid === me.id) return fail(400, "You cannot change your own role.");
+      if (b.role === "coach") await db.prepare("UPDATE users SET role = 'coach', invite = COALESCE(invite, ?) WHERE id = ?").bind(code(), uid).run();
+      else if (b.role === "athlete") await db.batch([db.prepare("UPDATE users SET coach_id = NULL WHERE coach_id = ?").bind(uid), db.prepare("UPDATE users SET role = 'athlete' WHERE id = ?").bind(uid)]);
+      else return fail(400, "Unknown role.");
+      return json({ ok: true });
+    }
+    return fail(404, "Not found.");
+  }
+
   if (path === "/api/account" && req.method === "DELETE") {
-    await db.batch([db.prepare("DELETE FROM docs WHERE user_id = ?").bind(me.id), db.prepare("DELETE FROM tokens WHERE user_id = ?").bind(me.id),
+    await db.batch([db.prepare("DELETE FROM docs WHERE user_id = ?").bind(me.id), db.prepare("DELETE FROM tokens WHERE user_id = ?").bind(me.id), db.prepare("DELETE FROM coach_requests WHERE user_id = ?").bind(me.id),
       db.prepare("DELETE FROM assignments WHERE client_id = ? OR coach_id = ?").bind(me.id, me.id), db.prepare("DELETE FROM comments WHERE client_id = ? OR coach_id = ?").bind(me.id, me.id),
       db.prepare("UPDATE users SET coach_id = NULL WHERE coach_id = ?").bind(me.id), db.prepare("DELETE FROM users WHERE id = ?").bind(me.id)]);
     return json({ ok: true });

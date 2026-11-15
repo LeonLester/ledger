@@ -13,6 +13,7 @@ import { Component, type ReactNode } from "react";
 import { Coach } from "./Coach";
 import { resume, setAfterPull, useSync, watchGoogleReturn } from "../sync";
 import { syncMealcost } from "../mealcost";
+import { Admin } from "./Admin";
 
 const TABS = [
   { id: "train", label: "Train", Icon: Dumbbell }, { id: "plan", label: "Plan", Icon: CalendarRange },
@@ -58,7 +59,8 @@ class Boundary extends Component<{ children: ReactNode; reset: unknown }, { err:
 
 export function App() {
   const { ready, settings, toast, openSession, mesos } = useStore();
-  const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("train");
+  const [tab, setTab] = useState<(typeof TABS)[number]["id"] | "admin">("train");
+  useEffect(() => { const h = (e: Event) => setTab((e as CustomEvent<"admin">).detail); window.addEventListener("ledger:tab", h); return () => window.removeEventListener("ledger:tab", h); }, []);
   const { phase, user } = useSync();
   useEffect(() => { if (user?.role === "coach" && !settings.onboarded) setTab("coach"); }, [user?.role, settings.onboarded]);
   useEffect(() => {
@@ -88,7 +90,7 @@ export function App() {
       </nav>
       <main className="main" id="main" data-open={openSession ? "1" : undefined}>
         <Boundary reset={tab}>{noProgram && ["train", "plan", "volume", "progress"].includes(tab) ? <Welcome /> : <>
-          {tab === "train" && <Train />}{tab === "plan" && <Plan />}{tab === "volume" && <Volume />}{tab === "progress" && <Progress />}{tab === "coach" && <Coach />}{tab === "more" && <More />}</>}</Boundary>
+          {tab === "train" && <Train />}{tab === "plan" && <Plan />}{tab === "volume" && <Volume />}{tab === "progress" && <Progress />}{tab === "coach" && <Coach />}{tab === "more" && <More />}{tab === "admin" && user?.admin && <Admin onBack={() => setTab("more")} />}</>}</Boundary>
       </main>
       <RestBar />
       {toast && <div className="toast" role="status">{toast}</div>}

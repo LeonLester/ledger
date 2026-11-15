@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft, Copy } from "lucide-react";
 import { api } from "../api";
+import { HOME } from "../native";
 import { useStore } from "../store";
 import { useSync } from "../sync";
 import { useViewing, type ClientView } from "../lib/view";
@@ -31,7 +32,8 @@ export function Coach() {
       <section className="panel row between wrap" style={{ padding: 16 }}>
         <div><div className="faint xs">Your coach code</div><div className="name num" style={{ fontSize: "1.8rem", letterSpacing: ".12em" }}>{user?.invite}</div>
           <div className="dim small">Clients enter it when they sign up, or under More, Coach.</div></div>
-        <button className="btn" onClick={() => { void navigator.clipboard?.writeText(user?.invite ?? ""); say("Code copied"); }}><Copy size={18} /> Copy</button>
+        <div className="row"><button className="btn" onClick={() => { void navigator.clipboard?.writeText(user?.invite ?? ""); say("Code copied"); }}><Copy size={18} /> Code</button>
+          <button className="btn" onClick={() => { void navigator.clipboard?.writeText(`${HOME}/#coach=${user?.invite ?? ""}`); say("Invite link copied"); }}><Copy size={18} /> Invite link</button></div>
       </section>
       <section className="panel list">
         {rows?.map((c) => (

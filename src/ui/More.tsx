@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Download, Upload } from "lucide-react";
 import { useStore } from "../store";
 import { sessionDate, sortSessions } from "../lib/selectors";
@@ -14,6 +14,22 @@ function save(name: string, text: string, type = "text/plain") {
   const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
 const csv = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+
+function CoachRequest() {
+  const say = useStore((s) => s.say);
+  const [pending, setPending] = useState<boolean | null>(null);
+  const [note, setNote] = useState("");
+  const [open, setOpen] = useState(false);
+  useEffect(() => { void api<{ pending: boolean }>("/api/coach-request").then((r) => setPending(r.pending)).catch(() => {}); }, []);
+  if (pending) return <p className="dim small">Your coach request is waiting for approval.</p>;
+  if (!open) return <button className="btn" onClick={() => setOpen(true)}>Request coach access</button>;
+  return (
+    <div className="stack" style={{ gap: 8 }}>
+      <label className="field"><span>Tell the admin who you are (optional)</span><input className="input" maxLength={300} value={note} onChange={(e) => setNote(e.target.value)} /></label>
+      <button className="btn primary" onClick={() => void api("/api/coach-request", { note }).then(() => { setPending(true); say("Request sent"); }).catch((e) => say(e.message))}>Send request</button>
+    </div>
+  );
+}
 
 function MealcostLink() {
   const mc = useMealcost();
@@ -108,6 +124,8 @@ export function More() {
         <h3>Account</h3>
         <div><b>{acct.user?.name}</b><div className="dim small">{acct.user?.email}{acct.user?.role === "coach" ? ", coach" : ""}</div></div>
         <p className="dim small" role="status">{acct.status === "syncing" ? "Syncing" : acct.status === "offline" ? "Offline. Changes sync when you are back online." : acct.status === "error" ? `Sync problem: ${acct.error}` : acct.last ? `Synced at ${new Date(acct.last).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "Not synced yet"}</p>
+        {acct.user?.admin && <button className="btn" onClick={() => window.dispatchEvent(new CustomEvent("ledger:tab", { detail: "admin" }))}>Open admin dashboard</button>}
+        {acct.user?.role === "athlete" && <CoachRequest />}
         {acct.user?.role === "coach" ? <p className="small">Your coach code is <b className="num" style={{ letterSpacing: ".1em" }}>{acct.user.invite}</b>. Clients enter it when they sign up.</p>
           : acct.user?.coachId ? <div className="row between wrap"><span className="small">Your coach: <b>{acct.user.coachName ?? "linked"}</b>. They can see your log and send programs and feedback.</span><button className="btn sm" onClick={() => confirm("Stop sharing your log with your coach?") && api("/api/join", {}).then(() => { useSync.setState({ user: { ...acct.user!, coachId: null, coachName: null } }); })}>Leave coach</button></div>
             : <div className="row"><input className="input" style={{ maxWidth: 180 }} placeholder="Coach code" aria-label="Coach code" autoCapitalize="characters" value={code} onChange={(e) => setCode(e.target.value)} /><button className="btn" disabled={!code.trim()} onClick={() => joinCoach(code.trim()).then(() => { st.say("Linked to your coach"); setCode(""); }).catch((e) => st.say(e.message))}>Join a coach</button></div>}

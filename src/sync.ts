@@ -118,6 +118,7 @@ async function claimLegacy() {
 /** Opens the account's database, pulls the latest data, then hands control to the app. */
 export async function enterAccount(user: Account) {
   useSync.setState({ user, phase: "booting", assignments: [], comments: [] });
+  try { for (const k of ["invite", "coach"]) sessionStorage.removeItem(`ledger.${k}`); } catch { /* blocked */ }
   uid = user.id;
   openDb(user.id);
   try { outbox = new Map(JSON.parse(localStorage.getItem(boxKey()) ?? "[]")); } catch { outbox = new Map(); }
@@ -163,11 +164,11 @@ const b64u = (u: Uint8Array) => btoa(String.fromCharCode(...u)).replace(/\+/g, "
 export const googleEnabled = () => api<{ google: boolean }>("/api/config").then((c) => c.google).catch(() => false);
 
 /** Opens Google in the browser (a Custom Tab in the app). A random verifier stays on this device; only its hash goes to the server. */
-export async function googleStart(coachCode?: string) {
+export async function googleStart(coachCode?: string, invite?: string) {
   const verifier = b64u(crypto.getRandomValues(new Uint8Array(48)));
   try { localStorage.setItem(GV, verifier); } catch { throw new Error("Storage is blocked, so Google sign-in cannot work."); }
   const challenge = b64u(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier))));
-  const q = new URLSearchParams({ c: challenge, ...(isNative ? { app: "1" } : {}), ...(coachCode ? { code: coachCode } : {}) });
+  const q = new URLSearchParams({ c: challenge, ...(isNative ? { app: "1" } : {}), ...(coachCode ? { code: coachCode } : {}), ...(invite ? { inv: invite } : {}) });
   const url = `${HOME}/api/google/start?${q}`;
   if (isNative) await Browser.open({ url }); else location.href = url;
 }
