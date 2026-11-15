@@ -3,6 +3,7 @@ import { ArrowLeft, Copy } from "lucide-react";
 import { api } from "../api";
 import { HOME } from "../native";
 import { useStore } from "../store";
+import { mesoLabel } from "../lib/selectors";
 import { useSync } from "../sync";
 import { useViewing, type ClientView } from "../lib/view";
 import { sortSessions } from "../lib/selectors";
@@ -73,7 +74,7 @@ function ClientDetail({ id, onBack }: { id: string; onBack: () => void }) {
       {tab === "log" && <ClientLog client={client} reload={load} />}
       {tab === "progress" && <Progress />}
       {tab === "sheet" && <div className="stack">
-        {mesos.length > 1 && <Seg value={mesoId} onChange={setSheetMeso} label="Mesocycle" options={mesos.map((m) => ({ v: m.id, label: m.name }))} />}
+        {mesos.length > 1 && <Seg value={mesoId} onChange={setSheetMeso} label="Mesocycle" options={mesos.map((m) => ({ v: m.id, label: mesoLabel(m.name) }))} />}
         {mesoId ? <LogSheet mesoId={mesoId} /> : <p className="dim">This client has no program yet.</p>}</div>}
       {tab === "assign" && <Assign client={client} reload={load} />}
     </div>

@@ -12,3 +12,4 @@ android/app/src/main/assets/capacitor*.json
 android/local.properties
 .test-out.mjs
 .dev.vars
+marketing/

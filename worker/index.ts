@@ -351,7 +351,7 @@ async function handle(req: Request, env: Env): Promise<Response> {
       const out = [];
       for (const c of clients) {
         const s = await db.prepare("SELECT COUNT(*) AS n, MAX(updated) AS last FROM docs WHERE user_id = ? AND kind = 'sessions' AND deleted = 0").bind(c.id).first<{ n: number; last: number | null }>();
-        const latest = await db.prepare("SELECT data FROM docs WHERE user_id = ? AND kind = 'sessions' AND deleted = 0 ORDER BY ts DESC LIMIT 1").bind(c.id).first<{ data: string }>();
+        const latest = await db.prepare("SELECT data FROM docs WHERE user_id = ? AND kind = 'sessions' AND deleted = 0 ORDER BY COALESCE(json_extract(data, '$.finished'), ts) DESC LIMIT 1").bind(c.id).first<{ data: string }>();
         let lastSession: string | null = null; try { const d = latest ? JSON.parse(latest.data) : null; lastSession = d ? `${d.name} (week ${d.week})${d.date ? `, ${d.date}` : ""}` : null; } catch { /* ignore */ }
         out.push({ ...c, sessions: s?.n ?? 0, lastSync: s?.last ?? null, lastSession });
       }

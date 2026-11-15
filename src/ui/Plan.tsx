@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ProgramPicker } from "./Programs";
 import { useStore } from "../store";
+import { mesoLabel } from "../lib/selectors";
 import { effectiveSessions, pumpLabels } from "../lib/progression";
 import { Seg } from "./common";
 import { MesoEditor, SplitEditor } from "./Builder";
@@ -32,7 +33,7 @@ export function Plan() {
       <CoachInbox />
       <Seg full value={view} onChange={setView} options={[{ v: "plan", label: "Plan" }, { v: "sheet", label: "Log sheet" }]} label="View" />
       <div className="row wrap">
-        <Seg value={mesoId} onChange={(v) => { setMesoId(v); setWeek(1); }} options={mesos.map((m) => ({ v: m.id, label: m.name }))} label="Mesocycle" />
+        <Seg value={mesoId} onChange={(v) => { setMesoId(v); setWeek(1); }} options={mesos.map((m) => ({ v: m.id, label: mesoLabel(m.name) }))} label="Mesocycle" />
         <Seg value={week} onChange={setWeek} options={meso.weeks.map((w) => ({ v: w.week, label: `W${w.week}` }))} label="Week" />
       </div>
       {mesoId !== settings.activeMeso && <div className="row"><span className="dim small">This is an earlier block.</span><button className="btn sm" onClick={() => setSettings({ activeMeso: mesoId, week })}>Make it active</button></div>}

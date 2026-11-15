@@ -96,7 +96,7 @@ export function buildSplit(t: Template, o: Opts, mesoId: string): Generated {
     sessions: sessions.map<PlanSession>((s) => ({
       name: s.name,
       items: DAYS[s.kind].slots.map<PlanItem>(([pk, sets, lo, hi], i) => ({
-        letter: String.fromCharCode(65 + i), exercise: pick(pk, s.occ), sets: setsFor(sets, week, scale), repLo: lo, repHi: hi, rir: RIR[week - 1],
+        letter: `${String.fromCharCode(65 + i)}1`, exercise: pick(pk, s.occ), sets: setsFor(sets, week, scale), repLo: lo, repHi: hi, rir: RIR[week - 1],
       })),
     })),
   }));

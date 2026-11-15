@@ -121,6 +121,7 @@ export const useStore = create<State>((set, get) => ({
     const [mesos, sessions, feedback, adjustments, bodyweight, lib, sp] = await Promise.all([
       db.mesos.toArray(), db.sessions.toArray(), db.feedback.toArray(), db.adjustments.toArray(), db.bodyweight.toArray(), db.kv.get("library"), db.kv.get("split"),
     ]);
+    mesos.sort((a, b) => mesoNum(a.id) - mesoNum(b.id));
     const { key: _k, ...loaded } = st as Settings & { key: string };
     let settings: Settings = loaded;
     // repair a settings row that points at a block or week that does not exist, which would leave Train, Plan and Volume empty

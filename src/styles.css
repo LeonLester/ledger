@@ -100,7 +100,7 @@ p { margin: 0; max-width: 62ch; }
 .pill.acc { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); background: var(--accent-soft); }
 .list > * + * { border-top: 1px solid var(--line); }
 .page-head { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 14px 12px; margin-bottom: 20px; }
-.page-head h1 { white-space: nowrap; }
+.page-head h1 { overflow-wrap: anywhere; }
 .page-head .sub { color: var(--dim); margin-top: 6px; }
 .empty { padding: 28px 18px; text-align: left; color: var(--dim); display: grid; gap: 12px; justify-items: start; }
 
@@ -223,3 +223,8 @@ tr.lib-h td { height: 28px; background: color-mix(in srgb, var(--mc) 30%, var(--
 .lib-in { width: 132px; height: 34px; background: transparent; border: 0; padding: 0 4px; border-radius: 6px; font-size: .86rem; }
 select.lib-in { width: 58px; }
 .lib-in:focus { outline: 2px solid var(--accent); background: var(--s2); }
+
+/* long segmented controls scroll sideways instead of widening the page */
+.seg:not(.full) { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.seg:not(.full)::-webkit-scrollbar { display: none; }
+.seg:not(.full) button { white-space: nowrap; }

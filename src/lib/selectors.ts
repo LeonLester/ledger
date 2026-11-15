@@ -50,3 +50,6 @@ export function sessionDate(s: Session, mesoStart: string | null, split: { day: 
   base.setDate(base.getDate() + diff);
   return base.toISOString().slice(0, 10);
 }
+
+/** Short label for a mesocycle chip: "PPL, block 3" becomes "Block 3". */
+export const mesoLabel = (name: string) => { const t = name.includes(", ") ? name.slice(name.lastIndexOf(", ") + 2) : name; return t.charAt(0).toUpperCase() + t.slice(1); };

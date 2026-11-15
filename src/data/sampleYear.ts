@@ -39,7 +39,7 @@ export function sampleYear(t: Template, today = new Date()): Year {
     const id = `m${b + 1}`;
     const g = buildSplit(t, opts, id);
     split = g.split;
-    mesos.push({ ...g.meso, name: `${g.meso.name}, block ${b + 1}` });
+    mesos.push({ ...g.meso, name: `${g.meso.name.replace(/ \(.*\)/, "")}, block ${b + 1}` });
     for (const wk of g.meso.weeks) {
       const gw = b * 5 + (wk.week - 1);
       if (gw > 51) continue;
