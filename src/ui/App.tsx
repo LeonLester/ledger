@@ -7,7 +7,7 @@ import { Volume } from "./Volume";
 import { Progress } from "./Progress";
 import { More } from "./More";
 import { Welcome } from "./Programs";
-import { canUpdate, checkUpdate } from "../native";
+import { canUpdate, checkUpdate, syncSystemBars } from "../native";
 import { Auth } from "./Auth";
 import { Component, type ReactNode } from "react";
 import { Coach } from "./Coach";
@@ -70,6 +70,9 @@ export function App() {
   useEffect(() => {
     const r = document.documentElement;
     if (settings.theme === "auto") r.removeAttribute("data-theme"); else r.setAttribute("data-theme", settings.theme);
+    syncSystemBars(settings.theme);
+    const mq = window.matchMedia("(prefers-color-scheme: dark)"); const on = () => syncSystemBars(settings.theme); mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
   }, [settings.theme]);
   if (phase === "out") return <Auth />;
   if (phase === "booting" || !ready) return <div className="main"><h1>Ledger</h1><p className="sub">Loading your log</p></div>;

@@ -1,4 +1,4 @@
-import { Capacitor, registerPlugin } from "@capacitor/core";
+import { Capacitor, registerPlugin, SystemBars, SystemBarsStyle } from "@capacitor/core";
 import { App } from "@capacitor/app";
 
 /** Where the Android build is published by .github/workflows/android.yml */
@@ -40,4 +40,11 @@ export async function checkWebUpdate(): Promise<"checked" | "unsupported"> {
   if (!r) return "unsupported";
   await r.update();
   return "checked";
+}
+
+/** Keeps the status and navigation bar icons readable against the app theme. */
+export function syncSystemBars(theme: "auto" | "dark" | "light") {
+  if (!isNative) return;
+  const dark = theme === "dark" || (theme === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  void SystemBars.setStyle({ style: dark ? SystemBarsStyle.Dark : SystemBarsStyle.Light }).catch(() => {});
 }
