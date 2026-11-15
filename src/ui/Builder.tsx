@@ -32,9 +32,9 @@ export function SessionsEditor({ sessions, onChange }: { sessions: PlanSession[]
               const g = runs(s.items)[j];
               const linked = prefix(it.letter) !== "" && g.pos > 0;
               return (
-              <div key={j} className="stack" style={{ gap: 8, paddingBottom: 12, borderBottom: "1px solid var(--line)", borderLeft: `4px solid ${muscleColor(muscleOf(it.exercise))}`, paddingLeft: 10, marginLeft: linked ? 14 : 0 }}>
+              <div key={j} className="stack" style={{ gap: 8, paddingBottom: 12, borderBottom: "1px solid var(--line)", marginLeft: linked ? 14 : 0 }}>
                 <div className="row" style={{ gap: 8, flexWrap: "nowrap" }}>
-                  <span className="letter">{it.letter === "~" ? "A1" : it.letter}</span>
+                  <span className="letter" style={{ background: `color-mix(in srgb, ${muscleColor(muscleOf(it.exercise))} 55%, var(--s1))`, color: "#0b0d10", borderColor: muscleColor(muscleOf(it.exercise)) }}>{it.letter === "~" ? "A1" : it.letter}</span>
                   {j > 0 && <button className="btn ghost sm" aria-pressed={linked} aria-label={linked ? "Remove from superset" : "Superset with the exercise above"} onClick={() => setSess(i, (x) => ({ ...x, items: linkPrev(x.items, j, !linked) }))}>{linked ? <Unlink2 size={16} color="var(--accent)" /> : <Link2 size={16} />}{linked ? "Unlink" : "Superset"}</button>}
                 </div>
                 <input className="input" list="ex-names" placeholder="Exercise" aria-label="Exercise" value={it.exercise} onChange={(e) => setItem(i, j, { exercise: e.target.value })} />

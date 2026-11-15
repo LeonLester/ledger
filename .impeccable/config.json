@@ -4,15 +4,6 @@
     "ignoreFiles": [],
     "ignoreValues": [
       {
-        "rule": "side-tab",
-        "value": "*",
-        "files": [
-          "src/styles.css"
-        ],
-        "createdAt": "2026-11-15T17:56:48.397Z",
-        "reason": "Agent: the 4px bars are the user-requested muscle colour coding and superset bracket from their workbook (data encoding, not decoration)"
-      },
-      {
         "rule": "cream-palette",
         "value": "*",
         "files": [

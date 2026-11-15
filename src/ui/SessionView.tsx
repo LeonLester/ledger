@@ -84,7 +84,7 @@ export function SessionView({ id }: { id: string }) {
         const col = muscleColor(muscleOf(ex.exercise));
         return (
           <article className={`ex ${g.size > 1 ? `ss ${g.first ? "ss-first" : ""} ${g.last ? "ss-last" : ""}` : ""}`} key={ex.letter + ex.exercise + i} style={{ "--mc": col } as CSSProperties}>
-            {g.size > 1 && g.first && <div className="ss-tag">Superset of {g.size}: alternate, rest after the last one</div>}
+            {g.size > 1 && g.first && <div className="ss-tag">Superset of {g.size}: alternate, rest after the last</div>}
             <div className="ex-head">
               <span className="letter" style={{ background: `color-mix(in srgb, ${col} 55%, var(--s1))`, color: "#0b0d10", borderColor: col }}>{ex.letter}</span>
               <div className="ex-name">{ex.exercise}</div>

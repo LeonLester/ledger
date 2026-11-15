@@ -51,7 +51,7 @@ export function Plan() {
               {s.items.map((i, k) => {
                 const b = base?.sessions.find((x) => x.name === s.name)?.items[k];
                 const delta = b ? i.sets - b.sets : 0;
-                return <tr key={i.letter + i.exercise}><td><div className="ex-cell" style={{ "--mc": muscleColor(muscleOf(i.exercise)) } as CSSProperties}><b>{i.letter}</b> {i.exercise}<div className="faint xs">{i.desc ?? muscleOf(i.exercise)}</div></div></td>
+                return <tr key={i.letter + i.exercise}><td><div className="ex-cell" style={{ "--mc": muscleColor(muscleOf(i.exercise)) } as CSSProperties}><span><b>{i.letter}</b> {i.exercise}<div className="faint xs">{i.desc ?? muscleOf(i.exercise)}</div></span></div></td>
                   <td className="num">{i.sets}{delta !== 0 && <span className={`pill ${delta > 0 ? "ok" : "warn"}`} style={{ marginLeft: 6 }}>{delta > 0 ? "+" : ""}{delta}</span>}</td>
                   <td className="num">{i.repLo ?? "-"}{i.repHi && i.repHi !== i.repLo ? `-${i.repHi}` : ""}</td><td className="num">{i.rir ?? "-"}</td></tr>;
               })}
