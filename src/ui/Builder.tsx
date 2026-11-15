@@ -1,18 +1,20 @@
 import { useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Link2, Plus, Trash2, Unlink2 } from "lucide-react";
+import { linkPrev, muscleColor, prefix, runs } from "../lib/groups";
 import { useStore } from "../store";
 import { buildSplit, TEMPLATES, WEEKDAYS, type Generated, type SplitRow } from "../data/templates";
 import { expand, relabel } from "../lib/expand";
 import type { Meso, PlanItem, PlanSession } from "../types";
 
 const REST = "Rest";
-const blank = (): PlanItem => ({ letter: "A", exercise: "", sets: 3, repLo: 8, repHi: 12, rir: 2 });
+const blank = (): PlanItem => ({ letter: "~", exercise: "", sets: 3, repLo: 8, repHi: 12, rir: 2 });
 const num = (v: string, d: number | null) => { const n = parseInt(v, 10); return Number.isFinite(n) ? n : d; };
 
 /** Edit a list of sessions: names, exercises, sets, rep range and RIR. Used by the program builder and by the plan editor. */
 export function SessionsEditor({ sessions, onChange }: { sessions: PlanSession[]; onChange: (s: PlanSession[]) => void }) {
   const names = useStore((s) => Object.keys(s.library).sort());
   const effort = useStore((s) => s.settings.effort ?? "rir");
+  const muscleOf = useStore((s) => s.muscleOf);
   const setSess = (i: number, fn: (s: PlanSession) => PlanSession) => onChange(sessions.map((s, k) => (k === i ? fn(s) : s)));
   const setItem = (i: number, j: number, patch: Partial<PlanItem>) => setSess(i, (s) => ({ ...s, items: s.items.map((it, k) => (k === j ? { ...it, ...patch } : it)) }));
   const move = (i: number, j: number, d: number) => setSess(i, (s) => { const a = [...s.items]; const t = j + d; if (t < 0 || t >= a.length) return s; [a[j], a[t]] = [a[t], a[j]]; return { ...s, items: relabel(a) }; });
@@ -26,8 +28,15 @@ export function SessionsEditor({ sessions, onChange }: { sessions: PlanSession[]
             <button className="btn ghost icon sm" aria-label={`Remove ${s.name}`} onClick={() => onChange(sessions.filter((_, k) => k !== i))}><Trash2 size={18} /></button>
           </div>
           <div className="stack" style={{ gap: 12 }}>
-            {s.items.map((it, j) => (
-              <div key={j} className="stack" style={{ gap: 8, paddingBottom: 12, borderBottom: "1px solid var(--line)" }}>
+            {s.items.map((it, j) => {
+              const g = runs(s.items)[j];
+              const linked = prefix(it.letter) !== "" && g.pos > 0;
+              return (
+              <div key={j} className="stack" style={{ gap: 8, paddingBottom: 12, borderBottom: "1px solid var(--line)", borderLeft: `4px solid ${muscleColor(muscleOf(it.exercise))}`, paddingLeft: 10, marginLeft: linked ? 14 : 0 }}>
+                <div className="row" style={{ gap: 8, flexWrap: "nowrap" }}>
+                  <span className="letter">{it.letter === "~" ? "A1" : it.letter}</span>
+                  {j > 0 && <button className="btn ghost sm" aria-pressed={linked} aria-label={linked ? "Remove from superset" : "Superset with the exercise above"} onClick={() => setSess(i, (x) => ({ ...x, items: linkPrev(x.items, j, !linked) }))}>{linked ? <Unlink2 size={16} color="var(--accent)" /> : <Link2 size={16} />}{linked ? "Unlink" : "Superset"}</button>}
+                </div>
                 <input className="input" list="ex-names" placeholder="Exercise" aria-label="Exercise" value={it.exercise} onChange={(e) => setItem(i, j, { exercise: e.target.value })} />
                 <div className="row" style={{ gap: 8, alignItems: "end", flexWrap: "wrap" }}>
                   <label className="field" style={{ width: 58 }}><span className="xs">Sets</span><input className="input num" inputMode="numeric" value={it.sets} onChange={(e) => setItem(i, j, { sets: Math.max(1, num(e.target.value, 1) ?? 1) })} /></label>
@@ -41,7 +50,8 @@ export function SessionsEditor({ sessions, onChange }: { sessions: PlanSession[]
                   </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
           <button className="btn sm" style={{ justifySelf: "start" }} onClick={() => setSess(i, (x) => ({ ...x, items: relabel([...x.items, blank()]) }))}><Plus size={16} /> Add exercise</button>
         </section>

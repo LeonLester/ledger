@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Disc3, Flame, Plus, Minus, Repeat, StickyNote, Trash2, Video } from "lucide-react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { ArrowLeft, Disc3, Flame, Link2, Plus, Minus, Repeat, StickyNote, Trash2, Unlink2, Video } from "lucide-react";
+import { muscleColor, runs } from "../lib/groups";
 import { PR_LABEL, sessionPrs } from "../lib/pr";
 import { TechSheet } from "./Technique";
 import { useStore } from "../store";
@@ -33,6 +34,7 @@ export function SessionView({ id }: { id: string }) {
   const [menu, setMenu] = useState<{ i: number; kind: "warm" | "plates" | "note" | "swap" | "tech" } | null>(null);
   const [finishing, setFinishing] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [linkNew, setLinkNew] = useState(false);
   const meso = mesos.find((m) => m.id === sess?.meso);
   const plan = useMemo(() => (meso && sess ? effectiveSessions(meso, sess.week, adjustments, muscleOf).find((p) => p.name === sess.name) : undefined), [meso, sess?.week, sess?.name, adjustments]);
   const prs = useMemo(() => (sess ? sessionPrs(sess, sessions, bodyweight, { mesoStart: settings.mesoStart, split }, sess.status === "active") : []), [sess, sessions, bodyweight]);
@@ -43,6 +45,7 @@ export function SessionView({ id }: { id: string }) {
   const total = sess.exercises.reduce((a, e) => a + e.sets.length, 0);
   const done = sess.exercises.reduce((a, e) => a + e.sets.filter((s) => s.done).length, 0);
   const readOnly = sess.status === "done";
+  const grp = runs(sess.exercises);
 
   const patchSet = (i: number, j: number, p: Partial<SetLog>) => updateEx(id, i, (e) => ({ ...e, sets: e.sets.map((s, k) => (k === j ? { ...s, ...p } : s)) }));
 
@@ -77,20 +80,23 @@ export function SessionView({ id }: { id: string }) {
         const unit = ex.unit ?? "kg";
         const prevSets = last ? last.sets : [];
         const first = ex.sets.find((s) => s.weight != null)?.weight ?? null;
+        const g = grp[i];
+        const col = muscleColor(muscleOf(ex.exercise));
         return (
-          <article className="ex" key={ex.letter + ex.exercise + i}>
+          <article className={`ex ${g.size > 1 ? `ss ${g.first ? "ss-first" : ""} ${g.last ? "ss-last" : ""}` : ""}`} key={ex.letter + ex.exercise + i} style={{ "--mc": col } as CSSProperties}>
+            {g.size > 1 && g.first && <div className="ss-tag">Superset of {g.size}: alternate, rest after the last one</div>}
             <div className="ex-head">
-              <span className="letter">{ex.letter}</span>
-              <div>
-                <div className="ex-name">{ex.exercise}</div>
-                <div className="dim small">{muscleOf(ex.exercise)}{ex.rir != null ? `, plan RIR ${ex.rir}` : ""}</div>
+              <span className="letter" style={{ background: `color-mix(in srgb, ${col} 55%, var(--s1))`, color: "#0b0d10", borderColor: col }}>{ex.letter}</span>
+              <div className="ex-name">{ex.exercise}</div>
+              <div className="ex-sub dim xs"><span>{muscleOf(ex.exercise)}{ex.rir != null ? `, plan ${rpeMode ? "RPE" : "RIR"} ${rpeMode ? 10 - ex.rir : ex.rir}` : ""}</span>
+              <div className="row tools">
+                {i > 0 && !readOnly && <button className="btn ghost icon sm" aria-label={g.pos > 0 ? "Remove from superset" : "Superset with the exercise above"} onClick={() => st.linkExercise(id, i, g.pos === 0)}>{g.pos > 0 ? <Unlink2 size={17} color="var(--accent)" /> : <Link2 size={17} />}</button>}
+                <button className="btn ghost icon sm" aria-label="Warm-up sets" onClick={() => setMenu({ i, kind: "warm" })}><Flame size={17} /></button>
+                <button className="btn ghost icon sm" aria-label="Plate calculator" onClick={() => setMenu({ i, kind: "plates" })}><Disc3 size={17} /></button>
+                <button className="btn ghost icon sm" aria-label="Swap exercise" onClick={() => setMenu({ i, kind: "swap" })}><Repeat size={17} /></button>
+                <button className="btn ghost icon sm" aria-label="Note" onClick={() => setMenu({ i, kind: "note" })}><StickyNote size={17} color={ex.note ? "var(--accent)" : undefined} /></button>
+                <button className="btn ghost icon sm" aria-label="Technique and bar path" onClick={() => setMenu({ i, kind: "tech" })}><Video size={17} color={ex.tech || ex.paths?.length ? "var(--accent)" : undefined} /></button>
               </div>
-              <div className="row" style={{ gap: 2 }}>
-                <button className="btn ghost icon sm" aria-label="Warm-up sets" onClick={() => setMenu({ i, kind: "warm" })}><Flame size={18} /></button>
-                <button className="btn ghost icon sm" aria-label="Plate calculator" onClick={() => setMenu({ i, kind: "plates" })}><Disc3 size={18} /></button>
-                <button className="btn ghost icon sm" aria-label="Swap exercise" onClick={() => setMenu({ i, kind: "swap" })}><Repeat size={18} /></button>
-                <button className="btn ghost icon sm" aria-label="Note" onClick={() => setMenu({ i, kind: "note" })}><StickyNote size={18} color={ex.note ? "var(--accent)" : undefined} /></button>
-                <button className="btn ghost icon sm" aria-label="Technique and bar path" onClick={() => setMenu({ i, kind: "tech" })}><Video size={18} color={ex.tech || ex.paths?.length ? "var(--accent)" : undefined} /></button>
               </div>
             </div>
             {item?.desc && <div className="target"><span>Prescribed <b>{item.desc}</b></span></div>}
@@ -162,14 +168,15 @@ export function SessionView({ id }: { id: string }) {
       })}
 
       <div className="row" style={{ margin: "18px 0", justifyContent: "space-between" }}>
-        <button className="btn" onClick={() => setAdding(true)}><Plus size={18} /> Add exercise</button>
-        {sess.status === "active" && <button className="btn ghost danger" onClick={() => confirm("Discard this session?") && st.deleteSession(id)}><Trash2 size={18} /> Discard</button>}
+        <button className="btn" onClick={() => setAdding(true)}><Plus size={17} /> Add exercise</button>
+        {sess.status === "active" && <button className="btn ghost danger" onClick={() => confirm("Discard this session?") && st.deleteSession(id)}><Trash2 size={17} /> Discard</button>}
       </div>
 
       {adding && (
         <Sheet title="Add exercise" onClose={() => setAdding(false)}>
+          {sess.exercises.length > 0 && <label className="row" style={{ gap: 10, marginBottom: 8 }}><input type="checkbox" checked={linkNew} onChange={(e) => setLinkNew(e.target.checked)} /><span className="small">Superset with {sess.exercises[sess.exercises.length - 1].exercise}</span></label>}
           <div className="list">{Object.values(library).sort((a, b) => a.name.localeCompare(b.name)).map((d) => (
-            <button key={d.name} className="sess-row" onClick={() => { st.addExercise(id, d.name); setAdding(false); }}>
+            <button key={d.name} className="sess-row" onClick={() => { st.addExercise(id, d.name, linkNew); setAdding(false); setLinkNew(false); }}>
               <div><div className="ex-name" style={{ fontSize: "1.2rem" }}>{d.name}</div><div className="dim small">{d.muscle}</div></div></button>
           ))}</div>
         </Sheet>

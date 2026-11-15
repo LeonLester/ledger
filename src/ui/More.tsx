@@ -3,6 +3,7 @@ import { Download, Upload } from "lucide-react";
 import { useStore } from "../store";
 import { sessionDate, sortSessions } from "../lib/selectors";
 import { Seg } from "./common";
+import { Library } from "./Library";
 import { DEFAULT_WARM, E1RM_LABEL, E1RM_TEXT, SCORE_LABEL, checkFormula, est1rm, formulas, parseWarm, warmText, compile, type E1rmKey, type ScoreKey } from "../lib/formulas";
 import { api } from "../api";
 import { LINK_PAGE, connectMealcost, disconnectMealcost, syncMealcost, useMealcost } from "../mealcost";
@@ -79,7 +80,6 @@ function FormulaSettings() {
 export function More() {
   const st = useStore();
   const { settings, setSettings, library, sessions, split, muscleOf } = st;
-  const [q, setQ] = useState("");
   const [code, setCode] = useState("");
   const acct = useSync();
   const file = useRef<HTMLInputElement>(null);
@@ -131,20 +131,7 @@ export function More() {
       <FormulaSettings />
       <MealcostLink />
 
-      <section className="panel stack" style={{ padding: 16 }}>
-        <h3>Exercise library</h3>
-        <input className="input" placeholder="Find an exercise" aria-label="Find an exercise" value={q} onChange={(e) => setQ(e.target.value)} />
-        <div className="list">{Object.values(library).filter((d) => d.name.toLowerCase().includes(q.toLowerCase())).sort((a, b) => (a.guessed === b.guessed ? a.name.localeCompare(b.name) : a.guessed ? -1 : 1)).slice(0, 40).map((d) => (
-          <div key={d.name} className="row between wrap" style={{ padding: "10px 0" }}>
-            <div><b>{d.name}</b>{d.guessed && <span className="pill warn" style={{ marginLeft: 8 }}>Guessed</span>}</div>
-            <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 84px 72px", gap: 8, width: "100%" }}>
-              <select className="input" style={{ width: "100%" }} aria-label={`${d.name} muscle`} value={d.muscle} onChange={(e) => st.setExercise(d.name, { muscle: e.target.value })}>{[...new Set([...muscles, "Unknown"])].map((m) => <option key={m}>{m}</option>)}</select>
-              <select className="input" style={{ width: "100%" }} aria-label={`${d.name} unit`} value={d.unit} onChange={(e) => st.setExercise(d.name, { unit: e.target.value as "kg" | "lb" | "pin" })}><option value="kg">kg</option><option value="lb">lb</option><option value="pin">pin</option></select>
-              <input className="input num" style={{ width: "100%" }} inputMode="decimal" aria-label={`${d.name} load step`} defaultValue={d.increment} onBlur={(e) => st.setExercise(d.name, { increment: Number(e.target.value) || d.increment })} />
-            </div>
-          </div>))}</div>
-        <p className="faint xs">Load step is how much the app adds once you hit the top of the rep range.</p>
-      </section>
+      <Library />
 
       {!isNative && (
         <section className="panel stack" style={{ padding: 16 }}>

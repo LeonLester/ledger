@@ -1,5 +1,6 @@
 import { Capacitor, registerPlugin, SystemBars, SystemBarsStyle } from "@capacitor/core";
 import { App } from "@capacitor/app";
+import { LocalNotifications } from "@capacitor/local-notifications";
 
 /** Where the Android build is published by .github/workflows/android.yml */
 const REPO = "LeonLester/ledger";
@@ -47,4 +48,55 @@ export function syncSystemBars(theme: "auto" | "dark" | "light") {
   if (!isNative) return;
   const dark = theme === "dark" || (theme === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
   void SystemBars.setStyle({ style: dark ? SystemBarsStyle.Dark : SystemBarsStyle.Light }).catch(() => {});
+}
+
+
+/* Rest timer alarm. The WebView stops running timers when the app is in the background, so the phone is rung by a scheduled system notification. */
+const REST_ID = 7001;
+let channelReady = false;
+let notifOk = false;
+let ctx: AudioContext | null = null;
+
+/** Call from a tap: unlocks audio for the beep and asks once for notification permission. */
+export async function primeAlarm() {
+  try { ctx = ctx ?? new AudioContext(); if (ctx.state === "suspended") await ctx.resume(); } catch { /* no audio */ }
+  if (!isNative) return;
+  try {
+    const p = await LocalNotifications.checkPermissions();
+    const r = p.display === "granted" ? p : await LocalNotifications.requestPermissions();
+    notifOk = r.display === "granted";
+    if (!channelReady) {
+      await LocalNotifications.createChannel({ id: "rest", name: "Rest timer", description: "Rings when your rest is over", importance: 5, visibility: 1, vibration: true, lights: true });
+      channelReady = true;
+    }
+  } catch { /* permission or plugin missing */ }
+}
+
+export async function scheduleRest(at: number) {
+  if (!isNative) return;
+  try {
+    await LocalNotifications.cancel({ notifications: [{ id: REST_ID }] });
+    await LocalNotifications.schedule({ notifications: [{ id: REST_ID, title: "Rest over", body: "Next set", channelId: "rest", schedule: { at: new Date(at), allowWhileIdle: true }, autoCancel: true }] });
+  } catch { /* notifications blocked */ }
+}
+
+export async function cancelRest() {
+  if (!isNative) return;
+  try { await LocalNotifications.cancel({ notifications: [{ id: REST_ID }] }); } catch { /* none pending */ }
+}
+
+/** In-app alert: three beeps and a buzz. */
+export function ringNow() {
+  if (notifOk) return; // the system notification rings instead
+  try { navigator.vibrate?.([400, 150, 400, 150, 400]); } catch { /* unsupported */ }
+  try {
+    const a = ctx ?? new AudioContext(); ctx = a;
+    const t0 = a.currentTime;
+    for (let k = 0; k < 3; k++) {
+      const o = a.createOscillator(), g = a.createGain();
+      o.type = "square"; o.frequency.value = k === 2 ? 1175 : 880;
+      g.gain.setValueAtTime(0.0001, t0 + k * 0.32); g.gain.exponentialRampToValueAtTime(0.5, t0 + k * 0.32 + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t0 + k * 0.32 + 0.25);
+      o.connect(g); g.connect(a.destination); o.start(t0 + k * 0.32); o.stop(t0 + k * 0.32 + 0.27);
+    }
+  } catch { /* audio blocked */ }
 }

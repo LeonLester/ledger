@@ -41,3 +41,10 @@ Regenerate the seed from the workbook: `SRC="/path/Training Log Leo 2026.xlsx" n
 - **Custom programs** (New program, Custom): any sessions, exercises, sets, rep ranges, RIR ramp, block length and weekly layout. **Edit sessions** changes an existing block for one week, from a week onward or all weeks. **Edit week** moves sessions between days.
 - **Log sheet** (Plan): spreadsheet view of a block, sessions as tables with weeks as columns. Type `100x8 100x8 95x9` into a cell.
 - **Progress, Trends**: pick lifts from a dropdown, overlay up to six on one chart (actual load or % of first), choose date or session on the x axis and the range.
+
+## Supersets, colours and the rest alarm
+
+- The plan letter is the workbook's: the same letter is one superset, the number is the order inside it (A1, A2, B1). Link or unlink an exercise with the chain button in the plan builder and in a live session; any number of exercises can share a letter. The rest timer starts after the last exercise of a superset.
+- Exercise cells use the workbook colours: push blue, pull green, quads red, hamstrings, glutes and erectors yellow, everything else pink.
+- More, Exercise library is one scrolling table grouped by muscle. Muscle, unit and load step are editable, and exercises can be added or removed.
+- On Android the rest timer schedules a system notification, so it rings with the app in the background. Allow notifications when asked.

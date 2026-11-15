@@ -1,6 +1,6 @@
-import type { PlanItem, PlanSession } from "../types";
-
-export const relabel = (items: PlanItem[]) => items.map((it, i) => ({ ...it, letter: String.fromCharCode(65 + i) }));
+import type { PlanSession } from "../types";
+import { relabel } from "./groups";
+export { relabel };
 
 /** Expands one template week into a whole block: RIR moves from `rirStart` to `rirEnd`, optional deload week. */
 export function expand(base: PlanSession[], weeks: number, rirStart: number, rirEnd: number, deload: boolean): { week: number; sessions: PlanSession[] }[] {

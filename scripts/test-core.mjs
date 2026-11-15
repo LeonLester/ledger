@@ -4,6 +4,7 @@ import { buildSplit, TEMPLATES } from "../src/data/templates.ts";
 import { PROGRAMS, trainingMaxes } from "../src/data/programs.ts";
 import { sessionPrs } from "../src/lib/pr.ts";
 import { parseSets } from "../src/lib/sheet.ts";
+import { linkPrev, relabel, runs, muscleColor } from "../src/lib/groups.ts";
 import { expand } from "../src/lib/expand.ts";
 import { setFormulas, est1rm, weightForReps, checkFormula, compile, score, parseWarm } from "../src/lib/formulas.ts";
 
@@ -109,5 +110,17 @@ const d = score(500, 80, "m", "dots"), w = score(500, 80, "m", "wilks"), g = sco
 ok(d > 300 && d < 400 && w > 300 && w < 450 && g > 60 && g < 90, `scores in range: ${d.toFixed(1)} ${w.toFixed(1)} ${g.toFixed(1)}`);
 ok(parseWarm("40%x8, 60 x 5")?.length === 2 && parseWarm("junk") === null, "warm-up parsing");
 
+{
+  const L = (...l) => l.map((letter) => ({ letter }));
+  ok(relabel(L("A", "B", "C")).map((x) => x.letter).join() === "A1,B1,C1", "relabel turns old A B C into A1 B1 C1");
+  const ss = linkPrev(L("A1", "B1", "C1"), 1, true);
+  ok(ss.map((x) => x.letter).join() === "A1,A2,B1", "link makes a superset and renumbers");
+  const tri = linkPrev(ss, 2, true);
+  ok(tri.map((x) => x.letter).join() === "A1,A2,A3", "superset of three");
+  ok(linkPrev(tri, 1, false).map((x) => x.letter).join() === "A1,B1,B2", "unlink splits the group at that exercise");
+  ok(runs(L("A1", "A2", "B1")).map((r) => `${r.size}${r.last ? "L" : ""}`).join() === "2,2L,1L", "runs mark group ends");
+  ok(runs(L("1", "2")).every((r) => r.size === 1), "digit-only legacy letters are not supersets");
+  ok(muscleColor("Chest") === "#6d9eeb" && muscleColor("Quads") === "#e06666" && muscleColor("Calves") === "#d5a6bd", "muscle colours");
+}
 console.log(fails ? `\n${fails} failed` : "\nall passed");
 process.exit(fails ? 1 : 0);

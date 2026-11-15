@@ -7,7 +7,7 @@ import { Volume } from "./Volume";
 import { Progress } from "./Progress";
 import { More } from "./More";
 import { Welcome } from "./Programs";
-import { canUpdate, checkUpdate, syncSystemBars } from "../native";
+import { canUpdate, checkUpdate, ringNow, scheduleRest, syncSystemBars } from "../native";
 import { Auth } from "./Auth";
 import { Component, type ReactNode } from "react";
 import { Coach } from "./Coach";
@@ -26,12 +26,12 @@ function RestBar() {
   const left = rest ? Math.max(0, Math.ceil((rest.until - now) / 1000)) : 0;
   useEffect(() => {
     if (rest && left === 0) {
-      try { navigator.vibrate?.([200, 100, 200]); const a = new AudioContext(); const o = a.createOscillator(); o.frequency.value = 880; o.connect(a.destination); o.start(); setTimeout(() => { o.stop(); a.close(); }, 220); } catch { /* audio blocked */ }
-      const t = setTimeout(stopRest, 4000); return () => clearTimeout(t);
+      ringNow();
+      const t = setTimeout(stopRest, 6000); return () => clearTimeout(t);
     }
   }, [left, rest, stopRest]);
   if (!rest) return null;
-  const adj = (d: number) => useStore.setState({ rest: { ...rest, until: rest.until + d * 1000, total: rest.total + d } });
+  const adj = (d: number) => { const until = rest.until + d * 1000; useStore.setState({ rest: { ...rest, until, total: rest.total + d } }); void scheduleRest(until); };
   return (
     <div className="restbar" role="timer" aria-label="Rest timer">
       <div><div className="xs" style={{ opacity: .7 }}>{left === 0 ? "Rest over" : "Rest"}</div><div className="t">{Math.floor(left / 60)}:{String(left % 60).padStart(2, "0")}</div></div>

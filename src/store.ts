@@ -3,6 +3,8 @@ import { db } from "./db";
 import { markAllDirty, resetRemote } from "./sync";
 import { setFormulas } from "./lib/formulas";
 import seedJson from "./data/seed.json";
+import { cancelRest, primeAlarm, scheduleRest } from "./native";
+import { linkPrev, relabel, runs } from "./lib/groups";
 import type { Adjustment, BodyWeight, ExerciseDef, ExLog, Feedback, Meso, Seed, Session, Settings, SetLog, Unit } from "./types";
 import { defaultIncrement, isoDate, uid, worked } from "./lib/math";
 import { coarse, guessMuscle } from "./lib/muscles";
@@ -49,7 +51,9 @@ interface State {
   closeSession(): void;
   updateEx(sessionId: string, idx: number, fn: (e: ExLog) => ExLog): void;
   toggleSet(sessionId: string, exIdx: number, setIdx: number): void;
-  addExercise(sessionId: string, name: string): void;
+  addExercise(sessionId: string, name: string, link?: boolean): void;
+  linkExercise(sessionId: string, idx: number, link: boolean): void;
+  removeExercise(name: string): void;
   finishSession(id: string, fb: Record<string, { pump: number; workload: number }>): void;
   reopenSession(id: string): void;
   deleteSession(id: string): void;
@@ -216,14 +220,28 @@ export const useStore = create<State>((set, get) => ({
     });
     set({ sessions });
   },
-  addExercise(sessionId, name) {
+  linkExercise(sessionId, idx, link) {
+    const sessions = get().sessions.map((s) => {
+      if (s.id !== sessionId) return s;
+      const next = { ...s, exercises: linkPrev(s.exercises, idx, link) };
+      persistSession(next);
+      return next;
+    });
+    set({ sessions });
+  },
+  removeExercise(name) {
+    const library = { ...get().library }; delete library[name];
+    set({ library }); void db.kv.put({ key: "library", value: library });
+  },
+  addExercise(sessionId, name, link) {
     const { sessions, library } = get();
     const lg = lastLog(name, sessions);
     const w = lg?.sets[0]?.weight ?? null;
     const next = sessions.map((s) => {
       if (s.id !== sessionId) return s;
-      const ex: ExLog = { letter: String.fromCharCode(65 + s.exercises.length), exercise: name, unit: library[name]?.unit ?? "kg", rir: 2, note: null, sets: [{ weight: w, reps: null, myo: [] }, { weight: w, reps: null, myo: [] }] };
-      const n = { ...s, exercises: [...s.exercises, ex] };
+      const ex: ExLog = { letter: "~", exercise: name, unit: library[name]?.unit ?? "kg", rir: 2, note: null, sets: [{ weight: w, reps: null, myo: [] }, { weight: w, reps: null, myo: [] }] };
+      const all = [...s.exercises, ex];
+      const n = { ...s, exercises: link && s.exercises.length ? linkPrev(all, all.length - 1, true) : relabel(all) };
       persistSession(n);
       return n;
     });
@@ -231,6 +249,8 @@ export const useStore = create<State>((set, get) => ({
   },
   toggleSet(sessionId, exIdx, setIdx) {
     let started = false;
+    const list = get().sessions.find((x) => x.id === sessionId)?.exercises ?? [];
+    const lastOfGroup = runs(list)[exIdx]?.last ?? true;
     get().updateEx(sessionId, exIdx, (e) => ({
       ...e, sets: e.sets.map((s, i) => {
         if (i !== setIdx) return s;
@@ -238,7 +258,7 @@ export const useStore = create<State>((set, get) => ({
         return { ...s, done };
       }),
     }));
-    if (started) get().startRest();
+    if (started && lastOfGroup) get().startRest();
   },
 
   finishSession(id, fb) {
@@ -329,9 +349,11 @@ export const useStore = create<State>((set, get) => ({
 
   startRest(sec) {
     const total = sec ?? get().settings.restSec;
-    set({ rest: { until: Date.now() + total * 1000, total } });
+    const until = Date.now() + total * 1000;
+    set({ rest: { until, total } });
+    void primeAlarm().then(() => scheduleRest(until));
   },
-  stopRest() { set({ rest: null }); },
+  stopRest() { set({ rest: null }); void cancelRest(); },
   say(msg) { set({ toast: msg }); setTimeout(() => get().toast === msg && set({ toast: null }), 2600); },
 
   async exportAll() {

@@ -1,12 +1,13 @@
-import { useMemo } from "react";
+import { useMemo, type CSSProperties } from "react";
 import { useData } from "../lib/view";
 import { useStore } from "../store";
 import { parseSets, setsText } from "../lib/sheet";
+import { muscleColor } from "../lib/groups";
 
 /** The training log as a grid: one table per session, exercises down, weeks across. Type "100x8 100x8 95x9" in a cell. */
 export function LogSheet({ mesoId }: { mesoId: string }) {
   const { mesos, sessions, readOnly } = useData();
-  const { sheetSets, say, addLibrary } = useStore();
+  const { sheetSets, say, addLibrary, muscleOf } = useStore();
   const meso = mesos.find((m) => m.id === mesoId);
   const tables = useMemo(() => {
     if (!meso) return [];
@@ -22,6 +23,7 @@ export function LogSheet({ mesoId }: { mesoId: string }) {
   if (!meso) return null;
   const weeks = meso.weeks.map((w) => w.week);
   const find = (week: number, name: string, ex: string) => sessions.find((s) => s.id === `${mesoId}w${week}-${name}`)?.exercises.find((e) => e.exercise === ex);
+  const letterOf = (name: string, ex: string) => { for (const w of meso.weeks) { const it = w.sessions.find((s) => s.name === name)?.items.find((i) => i.exercise === ex); if (it) return it.letter; } return ""; };
   const plan = (week: number, name: string, ex: string) => meso.weeks.find((w) => w.week === week)?.sessions.find((s) => s.name === name)?.items.find((i) => i.exercise === ex);
   return (
     <div className="stack-lg">
@@ -31,11 +33,11 @@ export function LogSheet({ mesoId }: { mesoId: string }) {
           <h3 style={{ padding: "12px 14px" }}>{name}</h3>
           <div style={{ overflowX: "auto" }}>
             <table className="t sheet-grid">
-              <thead><tr><th style={{ position: "sticky", left: 0, background: "var(--s1)", zIndex: 1 }}>Exercise</th>{weeks.map((w) => <th key={w}>W{w}</th>)}</tr></thead>
+              <thead><tr><th className="sheet-ex">Exercise</th>{weeks.map((w) => <th key={w}>W{w}</th>)}</tr></thead>
               <tbody>
                 {ex.map((n) => (
                   <tr key={n}>
-                    <td style={{ position: "sticky", left: 0, background: "var(--s1)", zIndex: 1, minWidth: 150 }}>{n}</td>
+                    <td className="sheet-ex" title={n} style={{ "--mc": muscleColor(muscleOf(n)) } as CSSProperties}><b>{letterOf(name, n)}</b> {n}</td>
                     {weeks.map((w) => {
                       const e = find(w, name, n), p = plan(w, name, n);
                       const cur = setsText(e);
