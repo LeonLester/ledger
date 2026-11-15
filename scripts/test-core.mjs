@@ -5,6 +5,7 @@ import { PROGRAMS, trainingMaxes } from "../src/data/programs.ts";
 import { sessionPrs } from "../src/lib/pr.ts";
 import { parseSets } from "../src/lib/sheet.ts";
 import { linkPrev, relabel, runs, muscleColor } from "../src/lib/groups.ts";
+import { sampleYear } from "../src/data/sampleYear.ts";
 import { expand } from "../src/lib/expand.ts";
 import { setFormulas, est1rm, weightForReps, checkFormula, compile, score, parseWarm } from "../src/lib/formulas.ts";
 
@@ -121,6 +122,14 @@ ok(parseWarm("40%x8, 60 x 5")?.length === 2 && parseWarm("junk") === null, "warm
   ok(runs(L("A1", "A2", "B1")).map((r) => `${r.size}${r.last ? "L" : ""}`).join() === "2,2L,1L", "runs mark group ends");
   ok(runs(L("1", "2")).every((r) => r.size === 1), "digit-only legacy letters are not supersets");
   ok(muscleColor("Chest") === "#6d9eeb" && muscleColor("Quads") === "#e06666" && muscleColor("Calves") === "#d5a6bd", "muscle colours");
+}
+for (const t of TEMPLATES) {
+  const y = sampleYear(t, new Date("2026-11-15T12:00:00"));
+  const dates = y.sessions.map((s) => s.date).sort();
+  const ids = new Set(y.sessions.map((s) => s.id));
+  const span = (new Date(dates[dates.length - 1]) - new Date(dates[0])) / 864e5;
+  ok(y.sessions.length > 80 && ids.size === y.sessions.length && span > 330 && dates[dates.length - 1] <= "2026-11-15" && y.mesos.length === 11 && y.bodyweight.length > 45, `sample year ${t.id}: ${y.sessions.length} sessions over ${Math.round(span)} days`);
+  ok(y.sessions.every((s) => s.exercises.every((e) => e.sets.every((x) => x.reps > 0 && (x.weight === null || x.weight > 0)))), `sample year ${t.id} sets valid`);
 }
 console.log(fails ? `\n${fails} failed` : "\nall passed");
 process.exit(fails ? 1 : 0);

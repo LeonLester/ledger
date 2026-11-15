@@ -4,6 +4,7 @@ import { useStore } from "../store";
 import { sessionDate, sortSessions } from "../lib/selectors";
 import { Seg } from "./common";
 import { Library } from "./Library";
+import { SamplePicker } from "./Samples";
 import { DEFAULT_WARM, E1RM_LABEL, E1RM_TEXT, SCORE_LABEL, checkFormula, est1rm, formulas, parseWarm, warmText, compile, type E1rmKey, type ScoreKey } from "../lib/formulas";
 import { api } from "../api";
 import { LINK_PAGE, connectMealcost, disconnectMealcost, syncMealcost, useMealcost } from "../mealcost";
@@ -96,6 +97,7 @@ function FormulaSettings() {
 export function More() {
   const st = useStore();
   const { settings, setSettings, library, sessions, split, muscleOf } = st;
+  const [samples, setSamples] = useState(false);
   const [code, setCode] = useState("");
   const acct = useSync();
   const file = useRef<HTMLInputElement>(null);
@@ -183,6 +185,8 @@ export function More() {
         </div>
         {undated > 0 && <p className="faint xs">{undated} older sessions have no date. Set the mesocycle start date above and they are dated by your weekly split.</p>}
         <input ref={file} type="file" accept="application/json" hidden onChange={async (e) => { const f = e.target.files?.[0]; if (!f) return; try { await st.importAll(await f.text()); st.say("Backup restored"); } catch (err) { st.say((err as Error).message); } e.target.value = ""; }} />
+        <button className="btn" style={{ justifySelf: "start" }} onClick={() => setSamples(true)}>Load sample data</button>
+        {samples && <SamplePicker onClose={() => setSamples(false)} />}
         <button className="btn danger" style={{ justifySelf: "start" }} onClick={() => confirm("Erase all your data, on this device and in your account? Back up first if you want to keep it.") && st.resetAll()}>Erase all data</button>
       </section>
     </div>

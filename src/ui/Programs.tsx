@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { Upload } from "lucide-react";
+import { SamplePicker } from "./Samples";
 import { useStore } from "../store";
 import { LIFTS, LIFT_LABEL } from "../data/catalog";
 import { buildSplit, TEMPLATES, type Template } from "../data/templates";
@@ -83,6 +84,7 @@ export function ProgramPicker({ onDone }: { onDone: () => void }) {
 export function Welcome() {
   const st = useStore();
   const [picking, setPicking] = useState(false);
+  const [samples, setSamples] = useState(false);
   const file = useRef<HTMLInputElement>(null);
   return (
     <div className="main" style={{ maxWidth: 720, margin: "0 auto" }}>
@@ -91,7 +93,7 @@ export function Welcome() {
         {!picking ? (
           <div className="stack">
             <button className="panel sess-row" onClick={() => setPicking(true)}><div><div className="name">Pick a program</div><div className="dim small">Upper lower, PPL, full body, any X and Y split, or a powerlifting program.</div></div></button>
-            <button className="panel sess-row" onClick={() => st.loadSample()}><div><div className="name">Load sample data</div><div className="dim small">Three real mesocycles of logged training, with PR checks and volume ready to explore. You can reset it later.</div></div></button>
+            <button className="panel sess-row" onClick={() => setSamples(true)}><div><div className="name">Load sample data</div><div className="dim small">A year of logged training for any split, or the real 2026 log, with PR checks and volume ready to explore. You can erase it later.</div></div></button>
             <button className="btn" style={{ justifySelf: "start" }} onClick={() => file.current?.click()}><Upload size={18} /> Restore a backup</button>
             <input ref={file} type="file" accept="application/json" hidden onChange={async (e) => { const f = e.target.files?.[0]; if (!f) return; try { await st.importAll(await f.text()); } catch (err) { st.say((err as Error).message); } e.target.value = ""; }} />
           </div>
@@ -99,6 +101,7 @@ export function Welcome() {
           <div className="stack"><button className="btn ghost" style={{ justifySelf: "start" }} onClick={() => setPicking(false)}>Back</button><ProgramPicker onDone={() => setPicking(false)} /></div>
         )}
       </div>
+      {samples && <SamplePicker onClose={() => setSamples(false)} />}
     </div>
   );
 }

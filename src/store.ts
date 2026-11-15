@@ -11,6 +11,8 @@ import { coarse, guessMuscle } from "./lib/muscles";
 import { effectiveSessions, feedbackDelta, mrvFor, suggestTarget, weekTarget } from "./lib/progression";
 import { lastLog, mesoNum } from "./lib/selectors";
 import { CAT, LIFT_NAME } from "./data/catalog";
+import { sampleYear } from "./data/sampleYear";
+import { TEMPLATES } from "./data/templates";
 import type { Generated } from "./data/templates";
 
 const seed = seedJson as unknown as Seed;
@@ -45,6 +47,7 @@ interface State {
   deleteMeso(id: string): void;
   loadSample(): Promise<void>;
   createProgram(build: (id: string) => Generated): Promise<void>;
+  loadSampleYear(templateId: string): Promise<void>;
   setSettings(p: Partial<Settings>): void;
   muscleOf(ex: string): string;
   startSession(week: number, name: string): string;
@@ -135,6 +138,26 @@ export const useStore = create<State>((set, get) => ({
   },
 
   /** Three real mesocycles of logged training, for exploring the app. */
+  /** A year of generated training for one split. Replaces the current program and logs. */
+  async loadSampleYear(templateId) {
+    const t = TEMPLATES.find((x) => x.id === templateId);
+    if (!t) return;
+    const y = sampleYear(t);
+    const lib: Record<string, ExerciseDef> = {};
+    for (const n of y.exercises) { const c = CAT[n]; lib[n] = { name: n, muscle: c?.muscle ?? guessMuscle(n), unit: "kg", increment: c?.inc ?? defaultIncrement("kg") }; }
+    await db.transaction("rw", [db.settings, db.mesos, db.sessions, db.kv, db.feedback, db.adjustments, db.bodyweight], async () => {
+      await Promise.all([db.mesos.clear(), db.sessions.clear(), db.feedback.clear(), db.adjustments.clear(), db.bodyweight.clear()]);
+      await db.mesos.bulkPut(y.mesos.map((m) => ({ ...m, athleteId: ATHLETE })));
+      await db.sessions.bulkPut(y.sessions.map((s) => ({ ...s, athleteId: ATHLETE, status: "done" as const })));
+      await db.bodyweight.bulkPut(y.bodyweight.map((b) => ({ ...b, athleteId: ATHLETE })));
+      await db.kv.put({ key: "library", value: lib });
+      await db.kv.put({ key: "split", value: y.split });
+      await db.settings.put({ ...DEFAULTS, week: y.week, activeMeso: y.activeMeso, mesoStart: y.start, onboarded: true, key: "main" });
+    });
+    await markAllDirty();
+    await get().init();
+  },
+
   async loadSample() {
     const sessions: Session[] = seed.sessions.map((s) => ({ ...s, athleteId: ATHLETE, status: "done" as const }));
     const maxWeek = Math.max(...sessions.filter((s) => s.meso === DEFAULTS.activeMeso).map((s) => s.week));
