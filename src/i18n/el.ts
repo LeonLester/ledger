@@ -170,6 +170,9 @@ export const EL: Record<string, string> = {
   "Change the sets of any exercise in any week by hand. Feedback adjustments stay layered on top.": "Άλλαξε με το χέρι τα σετ οποιασδήποτε άσκησης σε οποιαδήποτε εβδομάδα. Οι προσαρμογές από την ανατροφοδότηση μένουν από πάνω.", "These changes bring each week's muscle volume closest to your targets.": "Αυτές οι αλλαγές φέρνουν τον όγκο κάθε εβδομάδας όσο πιο κοντά στους στόχους σου.",
   "The plan already matches your targets": "Το πλάνο ταιριάζει ήδη με τους στόχους σου", "Set a target for at least one muscle first": "Βάλε πρώτα στόχο για τουλάχιστον έναν μυ", "Targets cleared": "Οι στόχοι καθαρίστηκαν", "Last wk": "Τελ. εβδ.", "Sets in the last week": "Σετ στην τελευταία εβδομάδα",
   "Create a new exercise": "Δημιουργία νέας άσκησης", "All exercises": "Όλες οι ασκήσεις", "Create new exercise": "Δημιουργία νέας άσκησης",
+  "First wk": "Πρώτη εβδ.", "Give an exercise different sets in its first and last week and the weeks in between fill in. Leave Last wk empty to keep the same sets.": "Δώσε σε μια άσκηση διαφορετικά σετ στην πρώτη και στην τελευταία εβδομάδα και οι ενδιάμεσες συμπληρώνονται. Άφησε το Τελ. εβδ. κενό για να μείνουν τα ίδια σετ.",
+  "To ramp an exercise, give it sets for the first of the weeks you are changing and different sets in the last box. The weeks in between are filled in, and a deload week gets half.": "Για να κλιμακώσεις μια άσκηση, δώσε της σετ για την πρώτη από τις εβδομάδες που αλλάζεις και διαφορετικά σετ στο τελευταίο κουτί. Οι ενδιάμεσες εβδομάδες συμπληρώνονται και η εβδομάδα εκφόρτισης παίρνει τα μισά.",
+  "Collapse the sidebar": "Σύμπτυξη πλαϊνής μπάρας", "Expand the sidebar": "Ανάπτυξη πλαϊνής μπάρας", "Log out of this device?": "Αποσύνδεση από αυτή τη συσκευή;", "Add a photo": "Προσθήκη φωτογραφίας", "Change photo": "Αλλαγή φωτογραφίας", "Remove photo": "Αφαίρεση φωτογραφίας", "That image could not be read": "Η εικόνα δεν διαβάστηκε",
   and: "και", of: "από", sets: "σετ", set: "σετ", exercises: "ασκήσεις", exercise: "άσκηση", week: "εβδομάδα", target: "στόχος", planned: "προγραμματισμένα", deload: "εκφόρτιση", bodyweight: "σωματικό βάρος", base: "βάση", plan: "πλάνο", Planned: "Προγραμματισμένα",
 };
 
@@ -186,6 +189,7 @@ export const EL_PATTERNS: [RegExp, (t: Tr, ...m: string[]) => string][] = [
   [/^Create "(.+)"$/, (t, a) => `Δημιουργία "${a}"`],
   [/^Sets updated in (\d+) weeks?$/, (t, a) => `Τα σετ ενημερώθηκαν σε ${a} εβδομάδ${a === "1" ? "α" : "ες"}`],
   [/^Same muscle \((.+)\)\. Loads reset to the new lift's history\.$/, (t, a) => `Ίδιος μυς (${a}). Τα φορτία ξεκινούν από το ιστορικό της νέας άσκησης.`],
+  [/^Account: (.+)$/, (t, a) => `Λογαριασμός: ${a}`],
   [/^Week (\d+)$/, (t, a) => `Εβδομάδα ${a}`],
   [/^W(\d+)$/, (t, a) => `Ε${a}`],
   [/^Block (\d+)$/, (t, a) => `Μπλοκ ${a}`],

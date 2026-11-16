@@ -49,6 +49,8 @@ interface State {
   createProgram(build: (id: string) => Generated): Promise<void>;
   loadSampleYear(templateId: string): Promise<void>;
   setSettings(p: Partial<Settings>): void;
+  avatar: string | null;
+  setAvatar(url: string | null): void;
   muscleOf(ex: string): string;
   /** [muscle, share of a set] for an exercise: the primary muscle at 1, then its contributors */
   weightsOf(ex: string): [string, number][];
@@ -79,10 +81,10 @@ interface State {
 const persistSession = (s: Session) => void db.sessions.put(s);
 
 export const useStore = create<State>((set, get) => ({
-  ready: false, settings: DEFAULTS, mesos: [], sessions: [], feedback: [], adjustments: [], bodyweight: [],
+  avatar: null, ready: false, settings: DEFAULTS, mesos: [], sessions: [], feedback: [], adjustments: [], bodyweight: [],
   library: {}, targets: seed.targets, landmarks: seed.landmarks, split: [], openSession: null, update: null, updateNote: "", rest: null, toast: null,
 
-  clear() { set({ ready: false, settings: DEFAULTS, mesos: [], sessions: [], feedback: [], adjustments: [], bodyweight: [], library: {}, split: [], openSession: null, rest: null }); },
+  clear() { set({ avatar: null, ready: false, settings: DEFAULTS, mesos: [], sessions: [], feedback: [], adjustments: [], bodyweight: [], library: {}, split: [], openSession: null, rest: null }); },
   saveSplit(split) { set({ split }); void db.kv.put({ key: "split", value: split }); },
   addLibrary(names) {
     const lib = { ...get().library }; let n = 0;
@@ -128,6 +130,7 @@ export const useStore = create<State>((set, get) => ({
     const [mesos, sessions, feedback, adjustments, bodyweight, lib, sp] = await Promise.all([
       db.mesos.toArray(), db.sessions.toArray(), db.feedback.toArray(), db.adjustments.toArray(), db.bodyweight.toArray(), db.kv.get("library"), db.kv.get("split"),
     ]);
+    const av = await db.kv.get("avatar");
     mesos.sort((a, b) => mesoNum(a.id) - mesoNum(b.id));
     const { key: _k, ...loaded } = st as Settings & { key: string };
     let settings: Settings = loaded;
@@ -142,7 +145,7 @@ export const useStore = create<State>((set, get) => ({
     const library = ensureCatalog(stored);
     if (Object.keys(library).length !== Object.keys(stored).length) void db.kv.put({ key: "library", value: library });
     setFormulas(settings.fx);
-    set({ ready: true, settings, mesos, sessions, feedback, adjustments, bodyweight, library, split: (sp?.value as Seed["split"]) ?? (settings.onboarded && mesos.length ? seed.split : []) });
+    set({ avatar: typeof av?.value === "string" ? av.value : null, ready: true, settings, mesos, sessions, feedback, adjustments, bodyweight, library, split: (sp?.value as Seed["split"]) ?? (settings.onboarded && mesos.length ? seed.split : []) });
   },
 
   /** Three real mesocycles of logged training, for exploring the app. */
@@ -295,6 +298,10 @@ export const useStore = create<State>((set, get) => ({
     void db.sessions.bulkPut(sessions.filter((x, i) => x !== st.sessions[i]));
     if (liftMap) void db.settings.put({ ...settings, key: "main" });
     return true;
+  },
+  setAvatar(url) {
+    set({ avatar: url });
+    if (url) void db.kv.put({ key: "avatar", value: url }); else void db.kv.delete("avatar");
   },
   setSessionNote(sessionId, note) {
     const sessions = get().sessions.map((x) => { if (x.id !== sessionId) return x; const n = { ...x, note: note || undefined }; persistSession(n); return n; });

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { BarChart3, CalendarRange, Dumbbell, Settings2, TrendingUp, Users } from "lucide-react";
+import { BarChart3, CalendarRange, Dumbbell, LogOut, PanelLeftClose, PanelLeftOpen, Settings2, TrendingUp, Users } from "lucide-react";
 import { useStore } from "../store";
 import { Train } from "./Train";
 import { Plan } from "./Plan";
@@ -11,7 +11,7 @@ import { canUpdate, checkUpdate, ringNow, scheduleRest, syncSystemBars } from ".
 import { Auth } from "./Auth";
 import { Component, type ReactNode } from "react";
 import { Coach } from "./Coach";
-import { resume, setAfterPull, useSync, watchGoogleReturn } from "../sync";
+import { logout, resume, setAfterPull, useSync, watchGoogleReturn } from "../sync";
 import { syncMealcost } from "../mealcost";
 import { Admin } from "./Admin";
 
@@ -19,6 +19,8 @@ const TABS = [
   { id: "train", label: "Train", Icon: Dumbbell }, { id: "plan", label: "Plan", Icon: CalendarRange },
   { id: "volume", label: "Volume", Icon: BarChart3 }, { id: "progress", label: "Progress", Icon: TrendingUp }, { id: "coach", label: "Clients", Icon: Users }, { id: "more", label: "More", Icon: Settings2 },
 ] as const;
+
+const initials = (n: string) => n.trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("") || "?";
 
 function RestBar() {
   const { rest, stopRest, startRest } = useStore();
@@ -62,6 +64,9 @@ export function App() {
   const [tab, setTab] = useState<(typeof TABS)[number]["id"] | "admin">("train");
   useEffect(() => { const h = (e: Event) => setTab((e as CustomEvent<"admin">).detail); window.addEventListener("ledger:tab", h); return () => window.removeEventListener("ledger:tab", h); }, []);
   const { phase, user } = useSync();
+  const avatar = useStore((s) => s.avatar);
+  const [collapsed, setCollapsed] = useState(() => { try { return localStorage.getItem("ledger.nav") === "1"; } catch { return false; } });
+  useEffect(() => { try { localStorage.setItem("ledger.nav", collapsed ? "1" : "0"); } catch { /* storage blocked */ } }, [collapsed]);
   useEffect(() => { if (user?.role === "coach" && !settings.onboarded) setTab("coach"); }, [user?.role, settings.onboarded]);
   useEffect(() => {
     setAfterPull(async () => { if (useSync.getState().user) await useStore.getState().init(); else useStore.getState().clear(); });
@@ -81,12 +86,24 @@ export function App() {
   const noProgram = !settings.onboarded || mesos.length === 0;
   if (noProgram && user?.role !== "coach") return <Welcome />;
   return (
-    <div className="app">
+    <div className={`app ${collapsed ? "collapsed" : ""}`}>
       <nav className="nav" aria-label="Main">
-        <div className="brand">Ledger</div>
+        <div className="nav-head">
+          <div className="brand"><span className="brand-full">Ledger</span>{collapsed && "L"}</div>
+          <button className="nav-toggle" aria-label={collapsed ? "Expand the sidebar" : "Collapse the sidebar"} aria-expanded={!collapsed} onClick={() => setCollapsed(!collapsed)}>{collapsed ? <PanelLeftOpen size={20} /> : <PanelLeftClose size={20} />}</button>
+        </div>
         {TABS.filter((t) => t.id !== "coach" || user?.role === "coach").map(({ id, label, Icon }) => (
-          <button key={id} aria-current={tab === id ? "page" : undefined} onClick={() => { setTab(id); if (id !== "train") useStore.getState().closeSession(); }}><Icon size={22} strokeWidth={2.2} />{label}</button>
+          <button key={id} aria-current={tab === id ? "page" : undefined} title={collapsed ? label : undefined} onClick={() => { setTab(id); if (id !== "train") useStore.getState().closeSession(); }}><Icon size={22} strokeWidth={2.2} /><span className="nav-label">{label}</span></button>
         ))}
+        {user && (
+          <div className="nav-extra nav-account">
+            <button className="who" aria-label={`Account: ${user.name}`} title={collapsed ? `${user.name}, ${user.email}` : undefined} onClick={() => { setTab("more"); useStore.getState().closeSession(); }}>
+              {avatar ? <img className="avatar" src={avatar} alt="" /> : <span className="avatar" aria-hidden="true">{initials(user.name || user.email)}</span>}
+              <span className="who-text"><b>{user.name}</b><span>{user.email}</span></span>
+            </button>
+            <button className="nav-out" aria-label="Log out" title="Log out" onClick={() => confirm("Log out of this device?") && void logout()}><LogOut size={18} /></button>
+          </div>
+        )}
       </nav>
       <main className="main" id="main" data-open={openSession ? "1" : undefined}>
         <Boundary reset={tab}>{noProgram && ["train", "plan", "volume", "progress"].includes(tab) ? <Welcome /> : <>

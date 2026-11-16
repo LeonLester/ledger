@@ -45,6 +45,29 @@ function RirTypes() {
   );
 }
 
+/** Square, small JPEG from a chosen photo, kept as a data URL so it syncs with the account. */
+async function toAvatar(file: File): Promise<string> {
+  const bmp = await createImageBitmap(file);
+  const n = 160, c = document.createElement("canvas"); c.width = c.height = n;
+  const side = Math.min(bmp.width, bmp.height);
+  c.getContext("2d")!.drawImage(bmp, (bmp.width - side) / 2, (bmp.height - side) / 2, side, side, 0, 0, n, n);
+  return c.toDataURL("image/jpeg", 0.82);
+}
+function ProfilePhoto() {
+  const { avatar, setAvatar, say } = useStore();
+  const file = useRef<HTMLInputElement>(null);
+  return (
+    <div className="row" style={{ gap: 12 }}>
+      {avatar ? <img className="avatar" style={{ width: 56, height: 56 }} src={avatar} alt="Your photo" /> : <span className="avatar" style={{ width: 56, height: 56 }} aria-hidden="true">?</span>}
+      <div className="row wrap" style={{ gap: 8 }}>
+        <button className="btn sm" onClick={() => file.current?.click()}>{avatar ? "Change photo" : "Add a photo"}</button>
+        {avatar && <button className="btn ghost sm" onClick={() => setAvatar(null)}>Remove photo</button>}
+      </div>
+      <input ref={file} type="file" accept="image/*" hidden onChange={async (e) => { const f = e.target.files?.[0]; e.target.value = ""; if (!f) return; try { setAvatar(await toAvatar(f)); } catch { say("That image could not be read"); } }} />
+    </div>
+  );
+}
+
 function CoachRequest() {
   const say = useStore((s) => s.say);
   const [pending, setPending] = useState<boolean | null>(null);
@@ -155,6 +178,7 @@ export function More() {
         <h3>Account</h3>
         <div><b>{acct.user?.name}</b><div className="dim small">{acct.user?.email}{acct.user?.role === "coach" ? ", coach" : ""}</div></div>
         <p className="dim small" role="status">{acct.status === "syncing" ? "Syncing" : acct.status === "offline" ? "Offline. Changes sync when you are back online." : acct.status === "error" ? `Sync problem: ${acct.error}` : acct.last ? `Synced at ${new Date(acct.last).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "Not synced yet"}</p>
+        <ProfilePhoto />
         {acct.user?.admin && <button className="btn" onClick={() => window.dispatchEvent(new CustomEvent("ledger:tab", { detail: "admin" }))}>Open admin dashboard</button>}
         {acct.user?.role === "athlete" && <CoachRequest />}
         {acct.user?.role === "coach" ? <p className="small">Your coach code is <b className="num" style={{ letterSpacing: ".1em" }}>{acct.user.invite}</b>. Clients enter it when they sign up.</p>
