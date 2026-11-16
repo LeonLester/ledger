@@ -13,7 +13,7 @@ export interface PlanItem {
 }
 export interface PlanSession { name: string; items: PlanItem[] }
 export interface PlanWeek { week: number; sessions: PlanSession[]; /** set when the weekday layout differs from week to week */ split?: { day: string; session: string; emphasis: string }[] }
-export interface Meso { id: string; name: string; weeks: PlanWeek[]; deload?: boolean }
+export interface Meso { id: string; name: string; weeks: PlanWeek[]; deload?: boolean; /** no fixed weekdays: sessions run in order, whenever the lifter can train */ flexible?: boolean }
 
 export interface SetLog { weight: number | null; reps: number | null; myo: number[]; rir?: number | null; done?: boolean; tr?: number | null; amrap?: boolean }
 export interface RepMetric { rom: number; mcv: number; pv: number; dev: number; tUp: number }

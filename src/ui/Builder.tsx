@@ -115,6 +115,7 @@ export function ProgramBuilder({ onSave, saveLabel = "Save program", onCancel, i
   const [split, setSplit] = useState<SplitRow[] | null>(null);
   const [splitB, setSplitB] = useState<SplitRow[] | null>(null);
   const [rotate, setRotate] = useState(false);
+  const [flex, setFlex] = useState(false);
   const days = useMemo(() => split ?? evenSplit(sessions.map((s) => s.name)), [split, sessions]);
   const valid = name.trim() && sessions.length > 0 && sessions.every((s) => s.name.trim() && s.items.some((i) => i.exercise.trim())) && new Set(sessions.map((s) => s.name.trim())).size === sessions.length;
   const fromTemplate = (id: string) => {
@@ -127,6 +128,7 @@ export function ProgramBuilder({ onSave, saveLabel = "Save program", onCancel, i
   const submit = () => {
     const clean = sessions.map((s) => ({ ...s, name: s.name.trim() }));
     const fix = (rows: SplitRow[]) => rows.map((r) => ({ ...r, session: clean.some((s) => s.name === r.session.trim()) ? r.session.trim() : REST }));
+    if (flex) return onSave((id): Generated => ({ meso: { id, name: name.trim(), flexible: true, weeks: expand(clean, weeks, rirStart, rirEnd, deload, useStore.getState().settings.rirTypes ?? DEFAULT_RIR_TYPES) }, split: fix(days), mode: "feedback", effort: "rir" }));
     const second = rotate ? fix(splitB ?? days) : null;
     const g = expandLayouts(clean, weeks, rirStart, rirEnd, deload, fix(days), second, useStore.getState().settings.rirTypes ?? DEFAULT_RIR_TYPES);
     return onSave((id): Generated => ({ meso: { id, name: name.trim(), weeks: g.weeks }, split: g.split, mode: "feedback", effort: "rir" }));
@@ -139,10 +141,13 @@ export function ProgramBuilder({ onSave, saveLabel = "Save program", onCancel, i
       <h3>Sessions</h3>
       <SessionsEditor sessions={sessions} onChange={setSessions} />
       <h3>Weekly layout</h3>
+      <label className="row" style={{ gap: 10, alignItems: "flex-start" }}><input type="checkbox" checked={flex} onChange={(e) => setFlex(e.target.checked)} /><span className="small"><b>No fixed weekdays.</b> Train the sessions in order on any day. Nothing is placed on the calendar for you.</span></label>
+      {!flex && <>
       <p className="dim small">Put the same session on more than one day to repeat it, for example Upper A, Lower A, Upper B, Lower B, Upper A, Lower A.</p>
       <SplitEditor split={days} sessions={sessions.map((s) => s.name.trim())} onChange={setSplit} />
       <label className="row" style={{ gap: 10 }}><input type="checkbox" checked={rotate} onChange={(e) => { setRotate(e.target.checked); if (e.target.checked && !splitB) setSplitB(days); }} /><span className="small">Use a different layout on even weeks (a two week rotation)</span></label>
       {rotate && <><h3>Even weeks</h3><SplitEditor split={splitB ?? days} sessions={sessions.map((s) => s.name.trim())} onChange={setSplitB} /></>}
+      </>}
       <h3>Block</h3>
       <div className="row wrap" style={{ gap: 28 }}>
         <Stepper label="Weeks" value={weeks} min={1} max={16} onChange={setWeeks} />

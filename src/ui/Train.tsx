@@ -18,10 +18,12 @@ export function Train() {
   const doneIds = new Set(sessions.filter((s) => s.status === "done").map((s) => s.id));
   const activeIds = new Set(sessions.filter((s) => s.status === "active").map((s) => s.id));
   const today = new Date().toLocaleDateString("en-US", { weekday: "long" });
-  const todaySess = weekSplit.find((s) => s.day === today)?.session;
+  const flex = !!meso.flexible;
+  const todaySess = flex ? undefined : weekSplit.find((s) => s.day === today)?.session;
   const todayName = planned.find((p) => p.name === todaySess || (todaySess === "Legs 1" && p.name === "Lower 1") || (todaySess === "Legs 2" && p.name === "Lower 2") || (!!todaySess && p.name.startsWith(todaySess + " ")))?.name;
+  const nextUp = flex ? planned.find((p) => !doneIds.has(`${meso.id}w${week}-${p.name}`))?.name : undefined;
   const suggestions = feedback.filter((f) => f.state === "pending" && f.delta != null && f.delta !== 0);
-  const emph = (n: string) => weekSplit.find((s) => s.session === n || (n.startsWith("Lower") && s.session === n.replace("Lower", "Legs")))?.emphasis;
+  const emph = (n: string) => flex ? undefined : weekSplit.find((s) => s.session === n || (n.startsWith("Lower") && s.session === n.replace("Lower", "Legs")))?.emphasis;
 
   return (
     <div className="stack-lg">
@@ -76,6 +78,7 @@ export function Train() {
               </div>
               <div className="row">
                 {p.name === todayName && state !== "done" && <span className="pill acc">Today</span>}
+                {flex && p.name === nextUp && state !== "done" && <span className="pill acc">Next up</span>}
                 {state === "done" ? <span className="pill ok"><Check size={14} /> Logged</span> : state === "active" ? <span className="pill acc">In progress</span> : <span className="sess-state" aria-label="Not started" />}
               </div>
             </button>
@@ -83,6 +86,8 @@ export function Train() {
         })}
         {planned.length === 0 && <div className="empty">No sessions planned for this week.</div>}
       </section>
+      {flex && planned.length > 0 && !nextUp && week < weeks[weeks.length - 1] && <button className="btn primary" onClick={() => setSettings({ week: week + 1 })}>Week {week} is done. Go to week {week + 1}</button>}
+      {flex && <p className="faint xs">No fixed weekdays: train the sessions in order, whenever you can. The next one is marked.</p>}
     </div>
   );
 }

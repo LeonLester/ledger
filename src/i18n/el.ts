@@ -160,6 +160,10 @@ export const EL: Record<string, string> = {
   "Mealcost did not accept that code. Make a new one and try again.": "Το Mealcost δεν δέχτηκε αυτόν τον κωδικό. Φτιάξε νέο και δοκίμασε ξανά.", "The link was removed or replaced in Mealcost. Paste a new code.": "Ο σύνδεσμος αφαιρέθηκε ή αντικαταστάθηκε στο Mealcost. Επικόλλησε νέο κωδικό.",
   "Could not reach Mealcost. It will retry when you are online.": "Δεν έγινε σύνδεση με το Mealcost. Θα ξαναδοκιμάσει όταν είσαι online.", "The formula ends too early": "Ο τύπος τελειώνει πολύ νωρίς", "At 100 x 5 it gives less than 100, so it would undercount.": "Στα 100 x 5 δίνει λιγότερο από 100, άρα θα υποτιμούσε.",
   Back: "Πλάτη", "Go back": "Πίσω", shoulders: "ώμοι", triceps: "τρικέφαλοι", biceps: "δικέφαλοι", chest: "στήθος", back: "πλάτη", "rear delts": "πίσω δελτοειδείς", quads: "τετρακέφαλοι", hamstrings: "οπίσθιοι μηριαίοι", glutes: "γλουτοί", calves: "γάμπες", legs: "πόδια", arms: "χέρια", abs: "κοιλιακοί",
+  "No fixed weekdays.": "Χωρίς σταθερές μέρες.", "Train the sessions in order on any day, so you do not have to follow a calendar week.": "Κάνε τις προπονήσεις με τη σειρά, όποια μέρα θέλεις, χωρίς να ακολουθείς εβδομάδα ημερολογίου.",
+  "Train the sessions in order on any day.": "Κάνε τις προπονήσεις με τη σειρά, όποια μέρα θέλεις.", "Train the sessions in order on any day. Nothing is placed on the calendar for you.": "Κάνε τις προπονήσεις με τη σειρά, όποια μέρα θέλεις. Τίποτα δεν μπαίνει αυτόματα στο ημερολόγιο.",
+  "No fixed weekdays: train the sessions in order, whenever you can. The next one is marked.": "Χωρίς σταθερές μέρες: κάνε τις προπονήσεις με τη σειρά, όποτε μπορείς. Η επόμενη είναι σημειωμένη.", "Next up": "Επόμενη", Schedule: "Πρόγραμμα", "Use fixed weekdays": "Χρήση σταθερών ημερών", "No fixed weekdays": "Χωρίς σταθερές μέρες",
+  "No fixed weekdays. Train the sessions in order, on any day, and the next one is marked in Train. Nothing is placed on the calendar for you.": "Χωρίς σταθερές μέρες. Κάνε τις προπονήσεις με τη σειρά, όποια μέρα θέλεις, και η επόμενη σημειώνεται στην Προπόνηση. Τίποτα δεν μπαίνει αυτόματα στο ημερολόγιο.", "Weekdays are on": "Οι σταθερές μέρες ενεργοποιήθηκαν", "Weekdays are off": "Οι σταθερές μέρες απενεργοποιήθηκαν",
   and: "και", of: "από", sets: "σετ", set: "σετ", exercises: "ασκήσεις", exercise: "άσκηση", week: "εβδομάδα", target: "στόχος", planned: "προγραμματισμένα", deload: "εκφόρτιση", bodyweight: "σωματικό βάρος", base: "βάση", plan: "πλάνο", Planned: "Προγραμματισμένα",
 };
 
@@ -172,6 +176,7 @@ export const EL_PATTERNS: [RegExp, (t: Tr, ...m: string[]) => string][] = [
   [/^(.+), block (\d+)$/, (t, a, b) => `${t(a)}, μπλοκ ${b}`],
   [/^(\d+) exercises?(,?)$/, (t, a, c) => `${a} ασκήσεις${c}`],
   [/^(\d+) sets?(,?)$/, (t, a, c) => `${a} σετ${c}`],
+  [/^Week (\d+) is done\. Go to week (\d+)$/, (t, a, b) => `Η εβδομάδα ${a} ολοκληρώθηκε. Πήγαινε στην εβδομάδα ${b}`],
   [/^Week (\d+)$/, (t, a) => `Εβδομάδα ${a}`],
   [/^W(\d+)$/, (t, a) => `Ε${a}`],
   [/^Block (\d+)$/, (t, a) => `Μπλοκ ${a}`],

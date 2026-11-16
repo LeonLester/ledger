@@ -4,7 +4,7 @@ import { useStore } from "../store";
 import { mesoLabel } from "../lib/selectors";
 import { effectiveSessions, pumpLabels } from "../lib/progression";
 import { Seg } from "./common";
-import { MesoEditor, SplitEditor } from "./Builder";
+import { MesoEditor, SplitEditor, evenSplit } from "./Builder";
 import { LogSheet } from "./LogSheet";
 import { muscleColor } from "../lib/groups";
 import type { CSSProperties } from "react";
@@ -67,10 +67,16 @@ export function Plan() {
         <p className="faint xs">Pending ratings: {feedback.filter((f) => f.soreness == null).length}. Pump scale: {pumpLabels.join(", ")}.</p>
       </section>}
 
-      {view === "plan" && <section className="panel stack" style={{ padding: 16 }}>
+      {view === "plan" && meso.flexible && <section className="panel stack" style={{ padding: 16 }}>
+        <h3>Schedule</h3>
+        <p className="dim small">No fixed weekdays. Train the sessions in order, on any day, and the next one is marked in Train. Nothing is placed on the calendar for you.</p>
+        <button className="btn sm" style={{ justifySelf: "start" }} onClick={() => { if (!globalSplit.some((r) => r.session !== "Rest")) saveSplit(evenSplit(eff.map((x) => x.name))); saveMeso({ ...meso, flexible: false }); say("Weekdays are on"); }}>Use fixed weekdays</button>
+      </section>}
+
+      {view === "plan" && !meso.flexible && <section className="panel stack" style={{ padding: 16 }}>
         <div className="row between"><h3>Weekly split{own ? `, week ${week}` : ""}</h3>
           {draft ? <div className="row"><button className="btn sm ghost" onClick={() => setDraft(null)}>Cancel</button><button className="btn sm primary" onClick={() => { if (own) saveMeso({ ...meso, weeks: meso.weeks.map((w) => (w.week === week ? { ...w, split: draft } : w)) }); else saveSplit(draft); setDraft(null); say("Weekly split saved"); }}>Save</button></div>
-            : <button className="btn sm" onClick={() => setDraft(split.length ? split : [])}>Edit week</button>}</div>
+            : <div className="row"><button className="btn ghost sm" onClick={() => { saveMeso({ ...meso, flexible: true }); say("Weekdays are off"); }}>No fixed weekdays</button><button className="btn sm" onClick={() => setDraft(split.length ? split : [])}>Edit week</button></div>}</div>
         {draft ? <SplitEditor split={draft} sessions={eff.map((s) => s.name)} onChange={setDraft} />
           : <table className="t"><tbody>{split.map((d) => <tr key={d.day}><td>{d.day}</td><td><b>{d.session}</b></td><td className="dim">{d.emphasis}</td></tr>)}</tbody></table>}
       </section>}

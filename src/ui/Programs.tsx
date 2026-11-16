@@ -21,16 +21,18 @@ function SplitConfig({ t, onClose, onDone }: { t: Template; onClose: () => void;
   const [upper, setUpper] = useState(3);
   const [lower, setLower] = useState(2);
   const o = { freq, upper, lower };
+  const [flex, setFlex] = useState(false);
   return (
     <Sheet title={t.name} onClose={onClose}>
       <p className="dim small">{t.blurb}</p>
       {t.opts === "freq" && <div className="field"><span>Sessions per week</span><Seg full value={freq} onChange={setFreq} options={[2, 3, 4, 5, 6].map((v) => ({ v, label: String(v) }))} label="Sessions per week" /></div>}
       {t.opts === "ul" && <div className="row" style={{ gap: 28 }}><Stepper label="Upper sessions" value={upper} min={1} max={4} onChange={setUpper} /><Stepper label="Lower sessions" value={lower} min={1} max={4} onChange={setLower} /></div>}
-      <div className="row wrap" style={{ gap: 6 }} aria-label="Week layout">
+      <label className="row" style={{ gap: 10, alignItems: "flex-start" }}><input type="checkbox" checked={flex} onChange={(e) => setFlex(e.target.checked)} /><span className="small"><b>No fixed weekdays.</b> Train the sessions in order on any day, so you do not have to follow a calendar week.</span></label>
+      {!flex && <div className="row wrap" style={{ gap: 6 }} aria-label="Week layout">
         {buildSplit(t, o, "preview").split.map((r) => <span key={r.day} className={`pill ${r.session === "Rest" ? "" : "acc"}`}><b>{r.day.slice(0, 3)}</b> {r.session}</span>)}
-      </div>
+      </div>}
       <p className="faint xs">Five weeks: four building weeks with falling RIR, then a deload. Sets per muscle then follow your pump and soreness ratings.</p>
-      <button className="btn primary" onClick={async () => { await createProgram((id) => buildSplit(t, o, id)); onDone(); }}>Start this split</button>
+      <button className="btn primary" onClick={async () => { await createProgram((id) => { const g = buildSplit(t, o, id); return flex ? { ...g, meso: { ...g.meso, flexible: true } } : g; }); onDone(); }}>Start this split</button>
     </Sheet>
   );
 }
@@ -39,6 +41,7 @@ function PlConfig({ p, onClose, onDone }: { p: Program; onClose: () => void; onD
   const { createProgram, settings, setSettings, addBodyweight } = useStore();
   const [m, setM] = useState<Record<string, string>>(Object.fromEntries(LIFTS.map((l) => [l, settings.tms?.[l] ? String(Math.round(settings.tms[l]! / p.tmFactor)) : ""])));
   const [bw, setBw] = useState("");
+  const [flex, setFlex] = useState(false);
   const num = (s: string) => Number(s.replace(",", ".")) || 0;
   const maxes = Object.fromEntries(LIFTS.map((l) => [l, num(m[l])])) as unknown as Maxes;
   return (
@@ -51,9 +54,10 @@ function PlConfig({ p, onClose, onDone }: { p: Program; onClose: () => void; onD
         <label className="field" style={{ flex: "1 1 120px" }}><span>Bodyweight (kg, optional)</span><input className="input num" inputMode="decimal" value={bw} onChange={(e) => setBw(e.target.value)} /></label>
         <div className="field" style={{ flex: "1 1 160px" }}><span>For DOTS score</span><Seg full value={settings.sex ?? "m"} onChange={(sex) => setSettings({ sex })} options={[{ v: "m", label: "Male" }, { v: "f", label: "Female" }]} label="Sex" /></div>
       </div>
+      <label className="row" style={{ gap: 10, alignItems: "flex-start" }}><input type="checkbox" checked={flex} onChange={(e) => setFlex(e.target.checked)} /><span className="small"><b>No fixed weekdays.</b> Train the sessions in order on any day.</span></label>
       <button className="btn primary" onClick={async () => {
         if (num(bw)) addBodyweight(num(bw));
-        await createProgram((id) => ({ ...p.build(id), tms: trainingMaxes(p, maxes) }));
+        await createProgram((id) => { const g = p.build(id); return { ...g, ...(flex ? { meso: { ...g.meso, flexible: true } } : {}), tms: trainingMaxes(p, maxes) }; });
         onDone();
       }}>Start this program</button>
     </Sheet>
