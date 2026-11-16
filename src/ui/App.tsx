@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { BarChart3, CalendarRange, Dumbbell, LogOut, Menu, PanelLeftClose, PanelLeftOpen, Settings2, Shield, TrendingUp, Users, X } from "lucide-react";
+import { BarChart3, CalendarRange, Dumbbell, LogOut, Menu, Library as LibraryIcon, PanelLeftClose, PanelLeftOpen, Ruler, Settings2, Shield, TrendingUp, Users, X } from "lucide-react";
 import { useStore } from "../store";
 import { Train } from "./Train";
 import { Plan } from "./Plan";
 import { Volume } from "./Volume";
 import { Progress } from "./Progress";
 import { More } from "./More";
+import { Exercises, Machines } from "./Tools";
 import { Welcome } from "./Programs";
 import { canUpdate, checkUpdate, ringNow, scheduleRest, syncSystemBars } from "../native";
 import { Auth } from "./Auth";
@@ -17,8 +18,9 @@ import { Admin } from "./Admin";
 
 const TABS = [
   { id: "train", label: "Train", Icon: Dumbbell }, { id: "plan", label: "Plan", Icon: CalendarRange },
-  { id: "volume", label: "Volume", Icon: BarChart3 }, { id: "progress", label: "Progress", Icon: TrendingUp }, { id: "coach", label: "Clients", Icon: Users }, { id: "more", label: "More", Icon: Settings2 },
-] as const;
+  { id: "volume", label: "Volume", Icon: BarChart3 }, { id: "progress", label: "Progress", Icon: TrendingUp }, { id: "coach", label: "Clients", Icon: Users }, { id: "exercises", label: "Exercises", Icon: LibraryIcon, side: true }, { id: "machines", label: "Machines", Icon: Ruler, side: true }, { id: "more", label: "More", Icon: Settings2 },
+] as readonly { id: string; label: string; Icon: typeof Dumbbell; side?: boolean }[];
+type TabId = "train" | "plan" | "volume" | "progress" | "coach" | "exercises" | "machines" | "more";
 
 const initials = (n: string) => n.trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("") || "?";
 
@@ -88,7 +90,7 @@ class Boundary extends Component<{ children: ReactNode; reset: unknown }, { err:
 
 export function App() {
   const { ready, settings, toast, openSession, mesos } = useStore();
-  const [tab, setTab] = useState<(typeof TABS)[number]["id"] | "admin">("train");
+  const [tab, setTab] = useState<TabId | "admin">("train");
   useEffect(() => { const h = (e: Event) => setTab((e as CustomEvent<"admin">).detail); window.addEventListener("ledger:tab", h); return () => window.removeEventListener("ledger:tab", h); }, []);
   const { phase, user } = useSync();
   const avatar = useStore((s) => s.avatar);
@@ -123,7 +125,7 @@ export function App() {
           <button className="nav-toggle" aria-label={collapsed ? "Expand the sidebar" : "Collapse the sidebar"} aria-expanded={!collapsed} onClick={() => setCollapsed(!collapsed)}>{collapsed ? <PanelLeftOpen size={20} /> : <PanelLeftClose size={20} />}</button>
         </div>
         {TABS.filter((t) => t.id !== "coach" || user?.role === "coach").map(({ id, label, Icon }) => (
-          <button key={id} aria-current={tab === id ? "page" : undefined} title={collapsed ? label : undefined} onClick={() => { setTab(id); if (id !== "train") useStore.getState().closeSession(); }}><Icon size={22} strokeWidth={2.2} /><span className="nav-label">{label}</span></button>
+          <button key={id} className={TABS.find((t) => t.id === id)?.side ? "side-only" : undefined} aria-current={tab === id ? "page" : undefined} title={collapsed ? label : undefined} onClick={() => { setTab(id as TabId); if (id !== "train") useStore.getState().closeSession(); }}><Icon size={22} strokeWidth={2.2} /><span className="nav-label">{label}</span></button>
         ))}
         {user && (
           <div className="nav-extra nav-account">
@@ -139,7 +141,7 @@ export function App() {
       {drawer && <Drawer tab={tab} onClose={() => setDrawer(false)} onPick={(t) => { setTab(t as typeof tab); useStore.getState().closeSession(); setDrawer(false); }} />}
       <main className="main" id="main" data-open={openSession ? "1" : undefined}>
         <Boundary reset={tab}>{noProgram && ["train", "plan", "volume", "progress"].includes(tab) ? <Welcome /> : <>
-          {tab === "train" && <Train />}{tab === "plan" && <Plan />}{tab === "volume" && <Volume />}{tab === "progress" && <Progress />}{tab === "coach" && <Coach />}{tab === "more" && <More />}{tab === "admin" && user?.admin && <Admin onBack={() => setTab("more")} />}</>}</Boundary>
+          {tab === "train" && <Train />}{tab === "plan" && <Plan />}{tab === "volume" && <Volume />}{tab === "progress" && <Progress />}{tab === "coach" && <Coach />}{tab === "exercises" && <Exercises />}{tab === "machines" && <Machines />}{tab === "more" && <More />}{tab === "admin" && user?.admin && <Admin onBack={() => setTab("more")} />}</>}</Boundary>
       </main>
       <RestBar />
       {toast && <div className="toast" role="status">{toast}</div>}
