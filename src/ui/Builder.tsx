@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { IntBox } from "./common";
 import { ArrowDown, ArrowUp, Link2, Plus, Trash2, Unlink2 } from "lucide-react";
 import { linkPrev, muscleColor, prefix, runs } from "../lib/groups";
 import { DEFAULT_RIR_TYPES, rirForType } from "../lib/rir";
@@ -42,12 +43,12 @@ export function SessionsEditor({ sessions, onChange }: { sessions: PlanSession[]
                 </div>
                 <input className="input" list="ex-names" placeholder="Exercise" aria-label="Exercise" value={it.exercise} onChange={(e) => { const d = library[e.target.value]; setItem(i, j, { exercise: e.target.value, ...(d?.rirType && !it.rirType && types.some((t) => t.id === d.rirType) ? { rirType: d.rirType } : {}) }); }} />
                 <div className="row" style={{ gap: 8, alignItems: "end", flexWrap: "wrap" }}>
-                  <label className="field" style={{ width: 58 }}><span className="xs">Sets</span><input className="input num" inputMode="numeric" value={it.sets} onChange={(e) => setItem(i, j, { sets: Math.max(1, num(e.target.value, 1) ?? 1) })} /></label>
-                  <label className="field" style={{ width: 58 }}><span className="xs">Reps</span><input className="input num" inputMode="numeric" aria-label="Reps from" value={it.repLo ?? ""} onChange={(e) => setItem(i, j, { repLo: num(e.target.value, null) })} /></label>
-                  <label className="field" style={{ width: 58 }}><span className="xs">To</span><input className="input num" inputMode="numeric" aria-label="Reps to" value={it.repHi ?? ""} onChange={(e) => setItem(i, j, { repHi: num(e.target.value, null) })} /></label>
+                  <label className="field" style={{ width: 58 }}><span className="xs">Sets</span><IntBox label="Sets" min={1} max={30} value={it.sets} onCommit={(n) => setItem(i, j, { sets: n ?? it.sets })} /></label>
+                  <label className="field" style={{ width: 58 }}><span className="xs">Reps</span><IntBox label="Reps from" empty min={0} max={200} value={it.repLo} onCommit={(n) => setItem(i, j, { repLo: n })} /></label>
+                  <label className="field" style={{ width: 58 }}><span className="xs">To</span><IntBox label="Reps to" empty min={0} max={200} value={it.repHi} onCommit={(n) => setItem(i, j, { repHi: n })} /></label>
                   {it.rirType && types.find((t) => t.id === it.rirType)
                     ? <div className="field" style={{ width: 84 }}><span className="xs">{effort.toUpperCase()}</span><div className="input num rir-fixed" aria-label={`${effort.toUpperCase()} follows the type`}>{(() => { const t = types.find((x) => x.id === it.rirType)!; return effort === "rpe" ? `${10 - t.start} to ${10 - t.end}` : `${t.start} to ${t.end}`; })()}</div></div>
-                    : <label className="field" style={{ width: 58 }}><span className="xs">{effort.toUpperCase()}</span><input className="input num" inputMode="numeric" aria-label={effort.toUpperCase()} value={it.rir ?? ""} onChange={(e) => setItem(i, j, { rir: num(e.target.value, null) })} /></label>}
+                    : <label className="field" style={{ width: 58 }}><span className="xs">{effort.toUpperCase()}</span><IntBox label={effort.toUpperCase()} empty min={0} max={20} value={it.rir} onCommit={(n) => setItem(i, j, { rir: n })} /></label>}
                   <label className="field" style={{ flex: 1, minWidth: 110 }}><span className="xs">RIR type</span>
                     <select className="input" aria-label="RIR type" value={it.rirType ?? ""} onChange={(e) => setItem(i, j, { rirType: e.target.value || undefined })}>
                       <option value="">Program default</option>{types.map((t) => <option key={t.id} value={t.id}>{t.name} ({t.start} to {t.end})</option>)}</select></label>

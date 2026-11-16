@@ -4,7 +4,7 @@ import { DEFAULT_RIR_TYPES } from "../lib/rir";
 import { getLang, setLang } from "../i18n";
 import { useStore } from "../store";
 import { sessionDate, sortSessions } from "../lib/selectors";
-import { Seg } from "./common";
+import { DecBox, IntBox, Seg } from "./common";
 import { Library } from "./Library";
 import { SamplePicker } from "./Samples";
 import { DEFAULT_WARM, E1RM_LABEL, E1RM_TEXT, SCORE_LABEL, checkFormula, est1rm, formulas, parseWarm, warmText, compile, type E1rmKey, type ScoreKey } from "../lib/formulas";
@@ -17,15 +17,6 @@ function save(name: string, text: string, type = "text/plain") {
   const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
 const csv = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-
-/** A number box that keeps what you type until you leave it, so 12 can be typed digit by digit. Commits any whole number from min to max. */
-function NumBox({ value, min, max, label, onCommit }: { value: number; min: number; max: number; label: string; onCommit: (n: number) => void }) {
-  const [t, setT] = useState(String(value));
-  useEffect(() => { setT(String(value)); }, [value]);
-  return <input className="input num" style={{ width: 64, flex: "none", textAlign: "center" }} inputMode="numeric" aria-label={label} value={t}
-    onChange={(e) => { const v = e.target.value.replace(/\D/g, "").slice(0, 2); setT(v); if (v !== "") { const n = parseInt(v, 10); if (n >= min && n <= max) onCommit(n); } }}
-    onBlur={() => { const n = parseInt(t, 10); if (!Number.isFinite(n)) setT(String(value)); else { const c = Math.max(min, Math.min(max, n)); setT(String(c)); onCommit(c); } }} />;
-}
 
 function RirTypes() {
   const { settings, setSettings } = useStore();
@@ -41,8 +32,8 @@ function RirTypes() {
         {types.map((t, i) => (
           <div key={t.id} className="row" style={{ flexWrap: "nowrap", gap: 6 }}>
             <input className="input" aria-label={`Name of type ${i + 1}`} value={t.name} onChange={(e) => upd(i, { name: e.target.value })} />
-            <NumBox label={`${t.name} first week ${rpe ? "RPE" : "RIR"}`} min={0} max={rpe ? 10 : 20} value={rpe ? 10 - t.start : t.start} onCommit={(n) => upd(i, { start: rpe ? 10 - n : n })} />
-            <NumBox label={`${t.name} last week ${rpe ? "RPE" : "RIR"}`} min={0} max={rpe ? 10 : 20} value={rpe ? 10 - t.end : t.end} onCommit={(n) => upd(i, { end: rpe ? 10 - n : n })} />
+            <IntBox label={`${t.name} first week ${rpe ? "RPE" : "RIR"}`} style={{ width: 64, flex: "none", textAlign: "center" }} min={0} max={rpe ? 10 : 20} value={rpe ? 10 - t.start : t.start} onCommit={(n) => n != null && upd(i, { start: rpe ? 10 - n : n })} />
+            <IntBox label={`${t.name} last week ${rpe ? "RPE" : "RIR"}`} style={{ width: 64, flex: "none", textAlign: "center" }} min={0} max={rpe ? 10 : 20} value={rpe ? 10 - t.end : t.end} onCommit={(n) => n != null && upd(i, { end: rpe ? 10 - n : n })} />
             <button className="btn ghost icon sm" aria-label={`Remove ${t.name}`} onClick={() => put(types.filter((_, k) => k !== i))}><Trash2 size={16} /></button>
           </div>
         ))}
@@ -178,8 +169,8 @@ export function More() {
         <div className="field"><span>Progression mode</span><Seg full value={settings.mode} onChange={(mode) => setSettings({ mode })} options={[{ v: "sheet", label: "Sheet only" }, { v: "feedback", label: "Sheet + feedback" }, { v: "auto", label: "Auto" }]} /></div>
         <p className="dim small">Sheet only follows your periodization targets. Sheet + feedback asks for pump, workload and soreness, then proposes set changes you accept. Auto applies them for you, capped at MRV.</p>
         <label className="field"><span>Mesocycle start date (needed to date the old sessions)</span><input type="date" className="input" value={settings.mesoStart ?? ""} onChange={(e) => setSettings({ mesoStart: e.target.value || null })} /></label>
-        <label className="field"><span>Rest timer (seconds)</span><input className="input num" inputMode="numeric" value={settings.restSec} onChange={(e) => setSettings({ restSec: Math.max(15, Number(e.target.value) || 150) })} /></label>
-        <div className="row"><label className="field" style={{ flex: 1 }}><span>Bar (kg)</span><input className="input num" inputMode="decimal" value={settings.bar} onChange={(e) => setSettings({ bar: Number(e.target.value) || 20 })} /></label>
+        <label className="field"><span>Rest timer (seconds)</span><IntBox label="Rest timer (seconds)" min={15} max={3600} value={settings.restSec} onCommit={(n) => n != null && setSettings({ restSec: n })} /></label>
+        <div className="row"><label className="field" style={{ flex: 1 }}><span>Bar (kg)</span><DecBox label="Bar (kg)" min={1} max={100} value={settings.bar} onCommit={(n) => setSettings({ bar: n })} /></label>
           <label className="field" style={{ flex: 2 }}><span>Plates per side (kg)</span><input className="input num" defaultValue={settings.plates.join(", ")} onBlur={(e) => setSettings({ plates: e.target.value.split(/[ ,]+/).map(Number).filter((n) => n > 0) })} /></label></div>
         <div className="field"><span>Effort scale</span><Seg full value={settings.effort ?? "rir"} onChange={(effort) => setSettings({ effort })} options={[{ v: "rir", label: "RIR" }, { v: "rpe", label: "RPE" }]} label="Effort scale" /></div>
         <div className="field"><span>Theme</span><Seg full value={settings.theme} onChange={(theme) => { setSettings({ theme }); }} options={[{ v: "auto", label: "System" }, { v: "dark", label: "Dark" }, { v: "light", label: "Light" }]} /></div>

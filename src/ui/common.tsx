@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { X } from "lucide-react";
 
 export function Seg<T extends string | number>({ value, options, onChange, full, accent, label }: { value: T; options: { v: T; label: string }[]; onChange: (v: T) => void; full?: boolean; accent?: boolean; label?: string }) {
@@ -44,4 +44,23 @@ export function LineChart({ points, unit, height = 180, color = "var(--accent)" 
       {points.filter((_, i) => i === 0 || i === points.length - 1 || i === Math.floor(points.length / 2)).map((p) => <text key={p.x} x={X(points.indexOf(p))} y={H - 6} textAnchor="middle">{p.label}</text>)}
     </svg>
   );
+}
+
+/** Whole-number box that keeps your typing until you leave it, so 12 can be typed digit by digit and the box can be emptied.
+ *  Commits as you type whenever the number is in range; on leaving, out-of-range values are clamped and an empty box becomes null (or the old value when empty is not allowed). */
+export function IntBox({ value, min, max, empty, label, onCommit, className = "input num", style }: { value: number | null; min: number; max: number; empty?: boolean; label: string; onCommit: (n: number | null) => void; className?: string; style?: React.CSSProperties }) {
+  const [t, setT] = useState(value == null ? "" : String(value));
+  useEffect(() => { setT(value == null ? "" : String(value)); }, [value]);
+  return <input className={className} style={style} inputMode="numeric" aria-label={label} value={t}
+    onChange={(e) => { const v = e.target.value.replace(/\D/g, "").slice(0, 3); setT(v); if (v === "") { if (empty) onCommit(null); return; } const n = parseInt(v, 10); if (n >= min && n <= max) onCommit(n); }}
+    onBlur={() => { if (t === "") { if (!empty) setT(String(value ?? min)); return; } const c = Math.max(min, Math.min(max, parseInt(t, 10))); setT(String(c)); onCommit(c); }} />;
+}
+
+/** Decimal box with the same typing behaviour: "17." and "17.5" can be typed, and leaving an empty box restores the old value. */
+export function DecBox({ value, min, max, label, onCommit, className = "input num" }: { value: number; min: number; max: number; label: string; onCommit: (n: number) => void; className?: string }) {
+  const [t, setT] = useState(String(value));
+  useEffect(() => { if (Number(t.replace(",", ".")) !== value) setT(String(value)); /* eslint-disable-next-line */ }, [value]);
+  return <input className={className} inputMode="decimal" aria-label={label} value={t}
+    onChange={(e) => { const v = e.target.value; if (!/^\d*[.,]?\d*$/.test(v)) return; setT(v); const n = Number(v.replace(",", ".")); if (v !== "" && Number.isFinite(n) && n >= min && n <= max) onCommit(n); }}
+    onBlur={() => { const n = Number(t.replace(",", ".")); if (t === "" || !Number.isFinite(n)) { setT(String(value)); return; } const c = Math.max(min, Math.min(max, n)); setT(String(c)); onCommit(c); }} />;
 }
