@@ -13,3 +13,4 @@ android/local.properties
 .test-out.mjs
 .dev.vars
 marketing/
+.test-lever.mjs

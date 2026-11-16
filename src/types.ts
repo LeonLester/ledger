@@ -33,6 +33,14 @@ export interface Feedback {
 }
 export interface Adjustment { id: string; athleteId: string; meso: string; week: number; muscle: string; delta: number; source: "feedback" | "manual" }
 export interface BodyWeight { id: string; athleteId: string; date: string; kg: number; src?: "mealcost" }
+/** lever geometry of a plate-loaded or pin machine, any length unit as long as both arms use it */
+export interface LeverSpec {
+  /** pivot to plates */ loadArm: number; /** pivot to handle or pad */ userArm: number;
+  /** handle arm angle above level at the bottom and top of the rep, degrees */ start: number; end: number;
+  /** angle of the plate arm relative to the handle arm, 0 same side or 180 opposite */ offset: number;
+  /** empty arm mass in kg and the distance from the pivot to its centre */ armMass: number; armCom: number;
+  path: "arc" | "fixed"; /** fixed pull direction in degrees from level */ pull: number;
+}
 export interface ExerciseDef {
   name: string; /** primary muscle: the one that limits the set */ muscle: string; unit: Unit; increment: number; guessed?: boolean;
   /** secondary muscles and the share of a set each one earns (0 to 1) */ contrib?: Record<string, number>;
@@ -40,6 +48,7 @@ export interface ExerciseDef {
   /** kg on the implement with no plates, for example a leg press sled */ base?: number;
   /** note shown every time this exercise is logged */ note?: string;
   /** RIR type a new plan row starts with */ rirType?: string;
+  /** lever geometry, used to show the effective load at the bottom and top */ lever?: LeverSpec;
 }
 
 export interface Settings {

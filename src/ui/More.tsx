@@ -6,6 +6,7 @@ import { useStore } from "../store";
 import { sessionDate, sortSessions } from "../lib/selectors";
 import { DecBox, IntBox, MODE_NAMES, ModeMenu, Seg } from "./common";
 import { Library } from "./Library";
+import { LeverSheet } from "./Lever";
 import { SamplePicker } from "./Samples";
 import { DEFAULT_WARM, E1RM_LABEL, E1RM_TEXT, SCORE_LABEL, checkFormula, est1rm, formulas, parseWarm, warmText, compile, type E1rmKey, type ScoreKey } from "../lib/formulas";
 import { api } from "../api";
@@ -165,6 +166,7 @@ export function More() {
   const st = useStore();
   const { settings, setSettings, library, sessions, split, muscleOf } = st;
   const [samples, setSamples] = useState(false);
+  const [lever, setLever] = useState(false);
   const [code, setCode] = useState("");
   const acct = useSync();
   const file = useRef<HTMLInputElement>(null);
@@ -221,6 +223,12 @@ export function More() {
       <FormulaSettings />
       <MealcostLink />
 
+      <section className="panel stack" style={{ padding: 16 }} aria-label="Machine calculator">
+        <h3>Mechanical advantage</h3>
+        <p className="dim small">Work out how heavy a lever machine really is at the bottom and the top of a rep, for a landmine row, pendulum squat or any plate-loaded arm. You can also save the geometry to an exercise from its ruler icon in a session.</p>
+        <button className="btn" style={{ justifySelf: "start" }} onClick={() => setLever(true)}>Open calculator</button>
+        {lever && <LeverSheet onClose={() => setLever(false)} />}
+      </section>
       <Library />
 
       {!isNative && (

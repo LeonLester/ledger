@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
-import { ArrowLeft, Disc3, Flame, Link2, Zap, Plus, Minus, Repeat, StickyNote, Trash2, Unlink2, Video } from "lucide-react";
+import { ArrowLeft, Disc3, Flame, Link2, Zap, Plus, Minus, Repeat, StickyNote, Ruler, Trash2, Unlink2, Video } from "lucide-react";
 import { muscleColor, runs } from "../lib/groups";
 import { PR_LABEL, sessionPrs } from "../lib/pr";
 import { TechSheet } from "./Technique";
+import { LeverSheet } from "./Lever";
+import { summarize } from "../lib/lever";
 import { useStore } from "../store";
 import { bestE1rm, defaultIncrement, fmtW, isMyo, PLATE_COLORS, plateLoad, warmups, workedSets } from "../lib/math";
 import { effectiveSessions, feedbackDelta, pumpLabels, sorenessLabels, suggestTarget, workloadLabels } from "../lib/progression";
@@ -40,7 +42,7 @@ export function SessionView({ id }: { id: string }) {
   const st = useStore();
   const { sessions, settings, mesos, adjustments, library, feedback, muscleOf, closeSession, updateEx, toggleSet, bodyweight, split } = st;
   const sess = sessions.find((s) => s.id === id);
-  const [menu, setMenu] = useState<{ i: number; kind: "warm" | "plates" | "note" | "swap" | "tech" } | null>(null);
+  const [menu, setMenu] = useState<{ i: number; kind: "warm" | "plates" | "note" | "swap" | "tech" | "lever" } | null>(null);
   const [finishing, setFinishing] = useState(false);
   const [adding, setAdding] = useState(false);
   const [linkNew, setLinkNew] = useState(false);
@@ -122,6 +124,7 @@ export function SessionView({ id }: { id: string }) {
                 <button className="btn ghost icon sm" aria-label="Plate calculator" onClick={() => setMenu({ i, kind: "plates" })}><Disc3 size={17} /></button>
                 <button className="btn ghost icon sm" aria-label="Swap exercise" onClick={() => setMenu({ i, kind: "swap" })}><Repeat size={17} /></button>
                 <button className="btn ghost icon sm" aria-label="Note" onClick={() => setMenu({ i, kind: "note" })}><StickyNote size={17} color={ex.note || def?.note ? "var(--accent)" : undefined} /></button>
+                <button className="btn ghost icon sm" aria-label="Machine mechanical advantage" onClick={() => setMenu({ i, kind: "lever" })}><Ruler size={17} color={def?.lever ? "var(--accent)" : undefined} /></button>
                 <button className="btn ghost icon sm" aria-label="Technique and bar path" onClick={() => setMenu({ i, kind: "tech" })}><Video size={17} color={ex.tech || ex.paths?.length ? "var(--accent)" : undefined} /></button>
               </div>
               </div>
@@ -132,6 +135,7 @@ export function SessionView({ id }: { id: string }) {
                 {ex.note && <span><b>Today:</b> {ex.note}</span>}
               </button>
             )}
+            {def?.lever && (() => { const w = first ?? tgt?.weight ?? null; if (!w) return null; const e = summarize(def.lever, w); return e.bottom == null || e.top == null ? null : <div className="target"><span>Effective load at {fmtW(w)} {unit} on the arm: <b className="num">{fmtW(Math.round(e.bottom * 10) / 10)} kg</b> at the bottom, <b className="num">{fmtW(Math.round(e.top * 10) / 10)} kg</b> at the top</span></div>; })()}
             {item?.desc && <div className="target"><span>Prescribed <b>{item.desc}</b></span></div>}
             {tgt && !item?.scheme && !(item?.pct != null && item.lift && settings.tms?.[item.lift]) && (
               <div className="target">
@@ -201,6 +205,7 @@ export function SessionView({ id }: { id: string }) {
                 <button className="btn primary" onClick={() => setMenu(null)}>Done</button>
               </Sheet>
             )}
+            {menu?.i === i && menu.kind === "lever" && <LeverSheet exercise={ex.exercise} weight={first ?? tgt?.weight ?? null} onClose={() => setMenu(null)} />}
             {menu?.i === i && menu.kind === "tech" && <TechSheet id={id} i={i} onClose={() => setMenu(null)} />}
             {menu?.i === i && menu.kind === "swap" && (
               <Sheet title={`Swap ${ex.exercise}`} onClose={() => { setMenu(null); setQ(""); }}>
