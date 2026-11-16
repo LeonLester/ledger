@@ -11,6 +11,8 @@ import { rirForType, DEFAULT_RIR_TYPES } from "../src/lib/rir.ts";
 import { kgLoad, bestE1rm } from "../src/lib/math.ts";
 import { setsPerMuscle } from "../src/lib/selectors.ts";
 import { suggestContrib } from "../src/lib/muscles.ts";
+import { isMyo, setCredit } from "../src/lib/math.ts";
+import { repsText } from "../src/lib/selectors.ts";
 import { volumeOf, setsForWeek, rampTargets, suggestSets, diffSets } from "../src/lib/volplan.ts";
 import { expand, expandLayouts } from "../src/lib/expand.ts";
 import { setFormulas, est1rm, weightForReps, checkFormula, compile, score, parseWarm } from "../src/lib/formulas.ts";
@@ -192,6 +194,17 @@ for (const t of TEMPLATES) {
   ok(volumeOf(dec, W).Chest < 6 && volumeOf(dec, W).Chest >= 2, "solver can also lower volume");
   const e = expand([{ name: "A", items: [mk("Fly", 3, { setsEnd: 6 })] }], 5, 3, 1, true);
   ok(e.map((w) => w.sessions[0].items[0].sets).join() === "3,4,5,6,3", "expand applies the per-exercise set ramp");
+}
+{
+  const plain = { weight: 60, reps: 10, myo: [] }, myo = { weight: 60, reps: 10, myo: [4, 3, 3] }, armed = { weight: 60, reps: 10, myo: [], myoOn: true };
+  ok(!isMyo(plain) && isMyo(myo) && isMyo(armed), "myo-rep sets are recognised");
+  ok(setCredit(plain) === 1 && setCredit(myo) === 1, "default: every set, myo or not, counts as one");
+  ok(setCredit(myo, { set: 0.5, mini: 0 }) === 0.5 && setCredit(plain, { set: 0.5, mini: 0 }) === 1, "a myo set can count as half a set");
+  ok(Math.abs(setCredit(myo, { set: 1, mini: 0.25 }) - 1.75) < 1e-9, "each mini-set can add to the credit");
+  ok(repsText({ reps: 10, myo: [4, 0, 3] }) === "10+4+3", "empty mini-sets are not shown");
+  const W = (e) => [[e, 1]];
+  const sess = [{ id: "s", meso: "m1", week: 1, exercises: [{ exercise: "Curl", sets: [plain, plain, myo] }] }];
+  ok(setsPerMuscle(sess, "m1", 1, W).Curl === 3 && setsPerMuscle(sess, "m1", 1, W, { set: 0.5, mini: 0 }).Curl === 2.5, "weekly volume follows the myo setting");
 }
 console.log(fails ? `\n${fails} failed` : "\nall passed");
 process.exit(fails ? 1 : 0);

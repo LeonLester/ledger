@@ -17,7 +17,7 @@ export interface PlanSession { name: string; items: PlanItem[] }
 export interface PlanWeek { week: number; sessions: PlanSession[]; /** set when the weekday layout differs from week to week */ split?: { day: string; session: string; emphasis: string }[] }
 export interface Meso { id: string; name: string; weeks: PlanWeek[]; deload?: boolean; /** no fixed weekdays: sessions run in order, whenever the lifter can train */ flexible?: boolean; /** weekly hard-set targets per muscle, one value per week (null = none) */ volTargets?: Record<string, (number | null)[]> }
 
-export interface SetLog { weight: number | null; reps: number | null; myo: number[]; rir?: number | null; done?: boolean; tr?: number | null; amrap?: boolean }
+export interface SetLog { weight: number | null; reps: number | null; /** reps of each mini-set after the first (myo-reps or rest-pause) */ myo: number[]; /** this set is a myo-rep set even before any mini-set is logged */ myoOn?: boolean; rir?: number | null; done?: boolean; tr?: number | null; amrap?: boolean }
 export interface RepMetric { rom: number; mcv: number; pv: number; dev: number; tUp: number }
 export interface BarPathRec { set: number; at: number; fps: number; pts: [number, number][]; reps: RepMetric[] }
 export interface ExLog { letter: string; exercise: string; unit: Unit | null; rir: number | null; sets: SetLog[]; note: string | null; /** share of bodyweight added to the logged load (1 for a pull-up) */ bwf?: number; /** kg already on the implement before any plates (sled, machine carriage) */ base?: number; /** bodyweight in kg when the exercise was added */ bw?: number | null; tech?: number | null; form?: string[]; paths?: BarPathRec[] }
@@ -44,7 +44,7 @@ export interface ExerciseDef {
 
 export interface Settings {
   athleteId: string; mode: Mode; unit: Unit; bar: number; plates: number[]; restSec: number;
-  theme: "auto" | "dark" | "light"; rirTypes?: RirType[]; mesoStart: string | null; activeMeso: string; week: number;
+  theme: "auto" | "dark" | "light"; rirTypes?: RirType[]; /** how many hard sets a myo-rep set counts as */ myoSet?: number; /** extra sets each mini-set adds to that */ myoMini?: number; /** seconds of rest between mini-sets */ myoRest?: number; mesoStart: string | null; activeMeso: string; week: number;
   fx?: import("./lib/formulas").Formulas; onboarded?: boolean; effort?: "rir" | "rpe"; sex?: "m" | "f"; tms?: Partial<Record<LiftKey, number>>; liftMap?: Partial<Record<LiftKey, string>>;
 }
 export interface Seed {

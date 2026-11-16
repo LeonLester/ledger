@@ -73,6 +73,7 @@ export function DecBox({ value, min, max, empty, label, onCommit, className = "i
     onBlur={() => { if (t === "" || !Number.isFinite(Number(t.replace(",", ".")))) { if (!empty) setT(String(value ?? min)); return; } const c = Math.max(min, Math.min(max, Number(t.replace(",", ".")))); setT(String(c)); onCommit(c); }} />;
 }
 
+export const MODE_NAMES: Record<string, string> = { sheet: "Sheet only", feedback: "Sheet + feedback", auto: "Auto" };
 const MODES = [
   { v: "sheet", name: "Sheet only", text: "Follows your plan exactly. No ratings and no set changes." },
   { v: "feedback", name: "Sheet + feedback", text: "After a session you rate pump and workload, then soreness next time. The app suggests set changes and you approve each one." },

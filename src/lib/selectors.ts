@@ -1,5 +1,5 @@
 import type { ExLog, Session } from "../types";
-import { workedSets } from "./math";
+import { setCredit, workedSets, type MyoCfg } from "./math";
 
 const SPLIT = ["Upper 2", "Upper A (Mon)", "Upper 1 (Mon)", "Legs 1", "Lower 1", "Upper 3", "Legs 2", "Lower 2", "Upper 1", "Upper A", "Misc"];
 export const mesoNum = (id: string) => Number(id.replace(/\D/g, "")) || 0;
@@ -20,7 +20,7 @@ export function lastLog(exercise: string, sessions: Session[], before?: Session)
 }
 export function repsText(s: { reps: number | null; myo: number[] }) {
   if (s.reps == null) return "";
-  return String(s.reps) + s.myo.map((m) => "+" + m).join("");
+  return String(s.reps) + s.myo.filter((m) => m > 0).map((m) => "+" + m).join("");
 }
 export function parseReps(t: string): { reps: number | null; myo: number[] } | null {
   const v = t.trim();
@@ -30,11 +30,11 @@ export function parseReps(t: string): { reps: number | null; myo: number[] } | n
   return { reps: a, myo: r };
 }
 /** hard sets per muscle for a week. A contributor earns its share of each set, so a bench set also counts a third toward triceps. */
-export function setsPerMuscle(sessions: Session[], meso: string, week: number, weightsOf: (e: string) => [string, number][]) {
+export function setsPerMuscle(sessions: Session[], meso: string, week: number, weightsOf: (e: string) => [string, number][], myo?: MyoCfg) {
   const out: Record<string, number> = {};
   for (const s of sessions) {
     if (s.meso !== meso || s.week !== week) continue;
-    for (const e of s.exercises) { const n = workedSets(e).length; if (n) for (const [m, f] of weightsOf(e.exercise)) out[m] = (out[m] ?? 0) + n * f; }
+    for (const e of s.exercises) { const n = workedSets(e).reduce((a, x) => a + setCredit(x, myo), 0); if (n) for (const [m, f] of weightsOf(e.exercise)) out[m] = (out[m] ?? 0) + n * f; }
   }
   return out;
 }

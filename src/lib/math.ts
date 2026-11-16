@@ -8,6 +8,12 @@ export const unitLabel = (u: Unit | null | undefined) => (u === "lb" ? "lb" : u 
 export const defaultIncrement = (u: Unit) => (u === "lb" ? 5 : u === "pin" ? 0.5 : 2.5);
 
 export const worked = (s: SetLog) => s.reps != null && s.reps > 0;
+
+/** A set with mini-sets (myo-reps, rest-pause), or one flagged as such before any mini-set is logged. */
+export const isMyo = (s: SetLog) => !!s.myoOn || (s.myo ?? []).some((n) => n > 0);
+export interface MyoCfg { set: number; mini: number }
+/** How many hard sets one logged set counts as for weekly volume: 1, or the myo setting plus a bonus per mini-set. */
+export const setCredit = (s: SetLog, c: MyoCfg = { set: 1, mini: 0 }) => (isMyo(s) ? c.set + c.mini * (s.myo ?? []).filter((n) => n > 0).length : 1);
 export const workedSets = (e: ExLog) => e.sets.filter(worked);
 
 /** total load of a set in kg: the logged weight (negative for assistance) plus bodyweight share plus the implement's own weight */

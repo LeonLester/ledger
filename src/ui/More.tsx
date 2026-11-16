@@ -4,7 +4,7 @@ import { DEFAULT_RIR_TYPES } from "../lib/rir";
 import { getLang, setLang } from "../i18n";
 import { useStore } from "../store";
 import { sessionDate, sortSessions } from "../lib/selectors";
-import { DecBox, IntBox, ModeMenu, Seg } from "./common";
+import { DecBox, IntBox, MODE_NAMES, ModeMenu, Seg } from "./common";
 import { Library } from "./Library";
 import { SamplePicker } from "./Samples";
 import { DEFAULT_WARM, E1RM_LABEL, E1RM_TEXT, SCORE_LABEL, checkFormula, est1rm, formulas, parseWarm, warmText, compile, type E1rmKey, type ScoreKey } from "../lib/formulas";
@@ -65,6 +65,21 @@ function ProfilePhoto() {
       </div>
       <input ref={file} type="file" accept="image/*" hidden onChange={async (e) => { const f = e.target.files?.[0]; e.target.value = ""; if (!f) return; try { setAvatar(await toAvatar(f)); } catch { say("That image could not be read"); } }} />
     </div>
+  );
+}
+
+function MyoSettings() {
+  const { settings, setSettings } = useStore();
+  return (
+    <section className="panel stack" style={{ padding: 16 }} aria-label="Myo-reps">
+      <div><h3>Myo-reps</h3><p className="dim small">Tap a set number while logging to make it a myo-rep set: do your reps, rest a few seconds, add a mini-set, and repeat. These settings decide how such a set counts toward weekly volume and how long the rests are.</p></div>
+      <div className="row" style={{ alignItems: "end" }}>
+        <label className="field" style={{ flex: 1 }}><span>A myo set counts as (sets)</span><DecBox label="A myo set counts as (sets)" min={0} max={5} value={settings.myoSet ?? 1} onCommit={(n) => n != null && setSettings({ myoSet: n })} /></label>
+        <label className="field" style={{ flex: 1 }}><span>Each mini-set adds (sets)</span><DecBox label="Each mini-set adds (sets)" min={0} max={2} value={settings.myoMini ?? 0} onCommit={(n) => n != null && setSettings({ myoMini: n })} /></label>
+      </div>
+      <label className="field"><span>Rest between mini-sets (seconds)</span><IntBox label="Rest between mini-sets (seconds)" min={5} max={120} value={settings.myoRest ?? 15} onCommit={(n) => n != null && setSettings({ myoRest: n })} /></label>
+      <p className="faint xs">Example: 1 and 0 counts every myo set as one set. 0.5 and 0 counts it as half a set. 1 and 0.25 counts an activation set plus 4 mini-sets as 2 sets. This only changes the Volume tab.</p>
+    </section>
   );
 }
 
@@ -190,7 +205,7 @@ export function More() {
 
       <section className="panel stack" style={{ padding: 16 }}>
         <h3>Training</h3>
-        <div className="field"><div className="row between"><span>Progression mode</span><ModeMenu value={settings.mode} onChange={(mode) => setSettings({ mode })} /></div><Seg full value={settings.mode} onChange={(mode) => setSettings({ mode })} options={[{ v: "sheet", label: "Sheet only" }, { v: "feedback", label: "Sheet + feedback" }, { v: "auto", label: "Auto" }]} /></div>
+        <div className="row between"><div><b>Progression mode</b><div className="dim small">{MODE_NAMES[settings.mode] ?? settings.mode}</div></div><ModeMenu value={settings.mode} onChange={(mode) => setSettings({ mode })} /></div>
         <label className="field"><span>Mesocycle start date (needed to date the old sessions)</span><input type="date" className="input" value={settings.mesoStart ?? ""} onChange={(e) => setSettings({ mesoStart: e.target.value || null })} /></label>
         <label className="field"><span>Rest timer (seconds)</span><IntBox label="Rest timer (seconds)" min={15} max={3600} value={settings.restSec} onCommit={(n) => n != null && setSettings({ restSec: n })} /></label>
         <div className="row"><label className="field" style={{ flex: 1 }}><span>Bar (kg)</span><DecBox label="Bar (kg)" min={1} max={100} value={settings.bar} onCommit={(n) => n != null && setSettings({ bar: n })} /></label>
@@ -201,6 +216,7 @@ export function More() {
       </section>
 
 
+      <MyoSettings />
       <RirTypes />
       <FormulaSettings />
       <MealcostLink />

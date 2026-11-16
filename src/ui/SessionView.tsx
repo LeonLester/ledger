@@ -1,22 +1,22 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
-import { ArrowLeft, Disc3, Flame, Link2, Plus, Minus, Repeat, StickyNote, Trash2, Unlink2, Video } from "lucide-react";
+import { ArrowLeft, Disc3, Flame, Link2, Zap, Plus, Minus, Repeat, StickyNote, Trash2, Unlink2, Video } from "lucide-react";
 import { muscleColor, runs } from "../lib/groups";
 import { PR_LABEL, sessionPrs } from "../lib/pr";
 import { TechSheet } from "./Technique";
 import { useStore } from "../store";
-import { bestE1rm, defaultIncrement, fmtW, PLATE_COLORS, plateLoad, warmups, workedSets } from "../lib/math";
+import { bestE1rm, defaultIncrement, fmtW, isMyo, PLATE_COLORS, plateLoad, warmups, workedSets } from "../lib/math";
 import { effectiveSessions, feedbackDelta, pumpLabels, sorenessLabels, suggestTarget, workloadLabels } from "../lib/progression";
 import { lastLog, parseReps, repsText, sortSessions } from "../lib/selectors";
 import { SessionComments } from "./CoachInbox";
 import type { ExLog, SetLog } from "../types";
-import { Seg, Sheet } from "./common";
+import { IntBox, Seg, Sheet } from "./common";
 import { ExerciseEditor, useAllMuscles } from "./Library";
 
-function RepsCell({ s, placeholder, onChange }: { s: SetLog; placeholder: string; onChange: (v: { reps: number | null; myo: number[] }) => void }) {
+function RepsCell({ s, placeholder, onChange }: { s: SetLog; placeholder: string; onChange: (v: { reps: number | null; myo?: number[] }) => void }) {
   const [t, setT] = useState(repsText(s));
   useEffect(() => { setT(repsText(s)); }, [s.reps, s.myo.join()]);
   return <input className="cell" inputMode="numeric" aria-label="Reps" placeholder={placeholder} value={t}
-    onChange={(e) => { setT(e.target.value); const p = parseReps(e.target.value); if (p) onChange(p); }} />;
+    onChange={(e) => { setT(e.target.value); const p = parseReps(e.target.value); if (p) onChange(e.target.value.includes("+") || e.target.value === "" ? p : { reps: p.reps }); }} />;
 }
 
 /** Weight with a local text state, so a minus sign or a trailing decimal point survives typing. Negative weights are for assistance. */
@@ -145,8 +145,10 @@ export function SessionView({ id }: { id: string }) {
                 const p = prevSets[j] ?? prevSets[prevSets.length - 1];
                 const rirClass = s.rir == null ? "" : s.rir <= 0 ? "rir-1" : s.rir === 1 ? "rir-2" : s.rir === 2 ? "rir-3" : "rir-4";
                 return (
-                  <div key={j} className={`set ${s.done ? "done" : ""}`}>
-                    <span className="n num">{j + 1}</span>
+                  <div key={j} className="set-block">
+                  <div className={`set ${s.done ? "done" : ""}`}>
+                    <button className={`n num myo-toggle ${isMyo(s) ? "on" : ""}`} aria-pressed={isMyo(s)} aria-label={`Set ${j + 1} myo-reps`} title="Tap to make this a myo-rep set" disabled={readOnly}
+                      onClick={() => patchSet(i, j, isMyo(s) ? { myoOn: false, myo: [] } : { myoOn: true })}>{isMyo(s) ? "M" : j + 1}</button>
                     <span className="prev num">{p && p.reps != null ? `${fmtW(p.weight) || "-"}x${repsText(p)}` : "-"}</span>
                     <WeightCell value={s.weight} text={!!ex.bwf} label={`Set ${j + 1} weight`} placeholder={fmtW(p?.weight ?? null) || "0"} onChange={(v) => patchSet(i, j, { weight: v })} />
                     <RepsCell s={s} placeholder={s.tr ? `${s.tr}${s.amrap ? "+" : ""}` : item?.repLo ? String(item.repLo) : "0"} onChange={(v) => patchSet(i, j, v)} />
@@ -155,6 +157,16 @@ export function SessionView({ id }: { id: string }) {
                       {s.done ? <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg> : null}
                     </button>
                   </div>
+                  {isMyo(s) && (
+                    <div className="myo-strip" aria-label={`Set ${j + 1} mini-sets`}>
+                      <span className="faint xs">Mini-sets</span>
+                      {s.myo.map((m, k) => <IntBox key={k} empty min={0} max={60} label={`Set ${j + 1} mini-set ${k + 1} reps`} value={m || null} className="input num myo-in"
+                        onCommit={(n) => patchSet(i, j, { myo: s.myo.map((x, q) => (q === k ? n ?? 0 : x)) })} />)}
+                      {!readOnly && <button className="btn sm" onClick={() => { patchSet(i, j, { myo: [...s.myo, 0] }); st.startRest(settings.myoRest ?? 15); }}>+ Mini-set, rest {settings.myoRest ?? 15} s</button>}
+                      {!readOnly && s.myo.length > 0 && <button className="btn ghost icon sm" aria-label="Remove the last mini-set" onClick={() => patchSet(i, j, { myo: s.myo.slice(0, -1) })}><Minus size={16} /></button>}
+                    </div>
+                  )}
+                  </div>
                 );
               })}
             </div>
@@ -162,6 +174,7 @@ export function SessionView({ id }: { id: string }) {
             <div className="addset">
               <button className="btn sm ghost" onClick={() => updateEx(id, i, (e) => ({ ...e, sets: [...e.sets, { weight: e.sets[e.sets.length - 1]?.weight ?? null, reps: null, myo: [] }] }))}><Plus size={16} /> Add set</button>
               {ex.sets.length > 1 && <button className="btn sm ghost" onClick={() => updateEx(id, i, (e) => ({ ...e, sets: e.sets.slice(0, -1) }))}><Minus size={16} /> Remove set</button>}
+              {!readOnly && <button className="btn sm ghost" aria-label="Myo-reps on the last set" onClick={() => { const k = ex.sets.length - 1; patchSet(i, k, isMyo(ex.sets[k]) ? { myoOn: false, myo: [] } : { myoOn: true }); }}><Zap size={16} /> Myo</button>}
               {last && <button className="btn sm ghost" onClick={() => updateEx(id, i, (e) => ({ ...e, sets: e.sets.map((s, k) => ({ ...s, weight: prevSets[k]?.weight ?? prevSets[prevSets.length - 1]?.weight ?? s.weight, reps: prevSets[k]?.reps ?? s.reps, myo: prevSets[k]?.myo ?? s.myo })) }))}>Copy last</button>}
             </div>
 

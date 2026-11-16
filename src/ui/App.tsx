@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { BarChart3, CalendarRange, Dumbbell, LogOut, PanelLeftClose, PanelLeftOpen, Settings2, TrendingUp, Users } from "lucide-react";
+import { BarChart3, CalendarRange, Dumbbell, LogOut, Menu, PanelLeftClose, PanelLeftOpen, Settings2, Shield, TrendingUp, Users, X } from "lucide-react";
 import { useStore } from "../store";
 import { Train } from "./Train";
 import { Plan } from "./Plan";
@@ -21,6 +21,33 @@ const TABS = [
 ] as const;
 
 const initials = (n: string) => n.trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("") || "?";
+
+/** The sidebar for phones: it slides in over the page from the menu button and holds the same places plus your account. */
+function Drawer({ tab, onPick, onClose }: { tab: string; onPick: (t: string) => void; onClose: () => void }) {
+  const { user } = useSync();
+  const avatar = useStore((s) => s.avatar);
+  useEffect(() => { const k = (e: KeyboardEvent) => e.key === "Escape" && onClose(); window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); }, [onClose]);
+  const items = [...TABS.filter((t) => t.id !== "coach" || user?.role === "coach").map(({ id, label, Icon }) => ({ id: id as string, label, Icon })), ...(user?.admin ? [{ id: "admin", label: "Admin", Icon: Shield }] : [])];
+  return (
+    <div className="drawer-scrim" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <aside className="drawer" role="dialog" aria-modal="true" aria-label="Menu">
+        <div className="row between" style={{ padding: "0 6px 14px 12px" }}><div className="brand-m">Ledger</div><button className="btn ghost icon sm" onClick={onClose} aria-label="Close the menu"><X size={20} /></button></div>
+        {items.map(({ id, label, Icon }) => (
+          <button key={id} className="drawer-item" aria-current={tab === id ? "page" : undefined} onClick={() => onPick(id)}><Icon size={22} strokeWidth={2.2} /><span>{label}</span></button>
+        ))}
+        {user && (
+          <div className="drawer-account">
+            <button className="who" aria-label={`Account: ${user.name}`} onClick={() => onPick("more")}>
+              {avatar ? <img className="avatar" src={avatar} alt="" /> : <span className="avatar" aria-hidden="true">{initials(user.name || user.email)}</span>}
+              <span className="who-text"><b>{user.name}</b><span>{user.email}</span></span>
+            </button>
+            <button className="btn ghost icon sm" aria-label="Log out" title="Log out" onClick={() => confirm("Log out of this device?") && void logout()}><LogOut size={18} /></button>
+          </div>
+        )}
+      </aside>
+    </div>
+  );
+}
 
 function RestBar() {
   const { rest, stopRest, startRest } = useStore();
@@ -65,6 +92,9 @@ export function App() {
   useEffect(() => { const h = (e: Event) => setTab((e as CustomEvent<"admin">).detail); window.addEventListener("ledger:tab", h); return () => window.removeEventListener("ledger:tab", h); }, []);
   const { phase, user } = useSync();
   const avatar = useStore((s) => s.avatar);
+  const [drawer, setDrawer] = useState(false);
+  const [fabHidden, setFabHidden] = useState(false);
+  useEffect(() => { let last = window.scrollY; const f = () => { const y = window.scrollY; setFabHidden(y > 90 && y > last); last = y; }; window.addEventListener("scroll", f, { passive: true }); return () => window.removeEventListener("scroll", f); }, []);
   const [collapsed, setCollapsed] = useState(() => { try { return localStorage.getItem("ledger.nav") === "1"; } catch { return false; } });
   useEffect(() => { try { localStorage.setItem("ledger.nav", collapsed ? "1" : "0"); } catch { /* storage blocked */ } }, [collapsed]);
   useEffect(() => { if (user?.role === "coach" && !settings.onboarded) setTab("coach"); }, [user?.role, settings.onboarded]);
@@ -105,6 +135,8 @@ export function App() {
           </div>
         )}
       </nav>
+      {!openSession && <button className={`menu-fab ${fabHidden ? "away" : ""}`} aria-label="Open the menu" onClick={() => setDrawer(true)}><Menu size={20} /></button>}
+      {drawer && <Drawer tab={tab} onClose={() => setDrawer(false)} onPick={(t) => { setTab(t as typeof tab); useStore.getState().closeSession(); setDrawer(false); }} />}
       <main className="main" id="main" data-open={openSession ? "1" : undefined}>
         <Boundary reset={tab}>{noProgram && ["train", "plan", "volume", "progress"].includes(tab) ? <Welcome /> : <>
           {tab === "train" && <Train />}{tab === "plan" && <Plan />}{tab === "volume" && <Volume />}{tab === "progress" && <Progress />}{tab === "coach" && <Coach />}{tab === "more" && <More />}{tab === "admin" && user?.admin && <Admin onBack={() => setTab("more")} />}</>}</Boundary>

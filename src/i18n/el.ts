@@ -178,6 +178,10 @@ export const EL: Record<string, string> = {
   "After a session you rate pump and workload, then soreness next time. The app suggests set changes and you approve each one.": "Μετά την προπόνηση βαθμολογείς pump και φόρτο και την επόμενη φορά τον πόνο. Η εφαρμογή προτείνει αλλαγές σετ και εγκρίνεις την καθεμία.",
   "The same ratings, but the changes are applied for you, capped at each muscle's volume ceiling (MRV).": "Οι ίδιες βαθμολογίες, αλλά οι αλλαγές εφαρμόζονται αυτόματα, με όριο το ανώτατο όριο όγκου (MRV) κάθε μυός.",
   "Modes change sets only, never the weights you are asked to lift.": "Οι τρόποι αλλάζουν μόνο τα σετ, ποτέ τα βάρη που σου ζητούνται.",
+  "Open the menu": "Άνοιγμα μενού", "Close the menu": "Κλείσιμο μενού", Menu: "Μενού", "Set 1 myo-reps": "Σετ 1 myo-reps", Myo: "Myo", "Myo-reps": "Myo-reps", "Mini-sets": "Μίνι-σετ", "Myo-reps on the last set": "Myo-reps στο τελευταίο σετ", "Tap to make this a myo-rep set": "Πάτα για να γίνει σετ myo-reps", "Remove the last mini-set": "Αφαίρεση τελευταίου μίνι-σετ",
+  "Tap a set number while logging to make it a myo-rep set: do your reps, rest a few seconds, add a mini-set, and repeat. These settings decide how such a set counts toward weekly volume and how long the rests are.": "Πάτα τον αριθμό ενός σετ κατά την καταγραφή για να γίνει σετ myo-reps: κάνε τις επαναλήψεις σου, ξεκουράσου λίγα δευτερόλεπτα, πρόσθεσε μίνι-σετ και επανάλαβε. Αυτές οι ρυθμίσεις ορίζουν πώς μετράει ένα τέτοιο σετ στον εβδομαδιαίο όγκο και πόσο διαρκούν οι ξεκούραστες.",
+  "A myo set counts as (sets)": "Ένα σετ myo μετράει ως (σετ)", "Each mini-set adds (sets)": "Κάθε μίνι-σετ προσθέτει (σετ)", "Rest between mini-sets (seconds)": "Ξεκούραση ανάμεσα στα μίνι-σετ (δευτερόλεπτα)",
+  "Example: 1 and 0 counts every myo set as one set. 0.5 and 0 counts it as half a set. 1 and 0.25 counts an activation set plus 4 mini-sets as 2 sets. This only changes the Volume tab.": "Παράδειγμα: 1 και 0 μετράει κάθε σετ myo ως ένα σετ. 0,5 και 0 το μετράει ως μισό σετ. 1 και 0,25 μετράει ένα σετ ενεργοποίησης και 4 μίνι-σετ ως 2 σετ. Αυτό αλλάζει μόνο την καρτέλα Όγκος.",
   and: "και", of: "από", sets: "σετ", set: "σετ", exercises: "ασκήσεις", exercise: "άσκηση", week: "εβδομάδα", target: "στόχος", planned: "προγραμματισμένα", deload: "εκφόρτιση", bodyweight: "σωματικό βάρος", base: "βάση", plan: "πλάνο", Planned: "Προγραμματισμένα",
 };
 
@@ -195,6 +199,10 @@ export const EL_PATTERNS: [RegExp, (t: Tr, ...m: string[]) => string][] = [
   [/^Sets updated in (\d+) weeks?$/, (t, a) => `Τα σετ ενημερώθηκαν σε ${a} εβδομάδ${a === "1" ? "α" : "ες"}`],
   [/^Same muscle \((.+)\)\. Loads reset to the new lift's history\.$/, (t, a) => `Ίδιος μυς (${a}). Τα φορτία ξεκινούν από το ιστορικό της νέας άσκησης.`],
   [/^Account: (.+)$/, (t, a) => `Λογαριασμός: ${a}`],
+  [/^\+ Mini-set, rest (\d+) s$/, (t, a) => `+ Μίνι-σετ, ξεκούραση ${a} δ`],
+  [/^Set (\d+) myo-reps$/, (t, a) => `Σετ ${a} myo-reps`],
+  [/^Set (\d+) mini-sets$/, (t, a) => `Μίνι-σετ του σετ ${a}`],
+  [/^Set (\d+) mini-set (\d+) reps$/, (t, a, b) => `Σετ ${a}, μίνι-σετ ${b}, επαναλήψεις`],
   [/^Week (\d+)$/, (t, a) => `Εβδομάδα ${a}`],
   [/^W(\d+)$/, (t, a) => `Ε${a}`],
   [/^Block (\d+)$/, (t, a) => `Μπλοκ ${a}`],

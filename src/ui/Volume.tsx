@@ -7,14 +7,15 @@ import { fmtSets, setsPerMuscle } from "../lib/selectors";
 export function Volume() {
   const { mesos, settings, sessions, targets, landmarks, library, muscleOf, weightsOf, adjustments, setSettings } = useStore();
   const meso = mesos.find((m) => m.id === settings.activeMeso) ?? mesos[mesos.length - 1];
+  const myo = { set: settings.myoSet ?? 1, mini: settings.myoMini ?? 0 };
   if (!meso) return null;
   const week = settings.week;
   const weeks = meso.weeks.map((w) => w.week);
-  const done = setsPerMuscle(sessions, meso.id, week, weightsOf);
+  const done = setsPerMuscle(sessions, meso.id, week, weightsOf, myo);
   const planned: Record<string, number> = {};
   for (const s of effectiveSessions(meso, week, adjustments, muscleOf)) for (const i of s.items) for (const [m, f] of weightsOf(i.exercise)) planned[m] = (planned[m] ?? 0) + i.sets * f;
   const muscles = [...new Set([...Object.keys(planned), ...Object.keys(done)])].filter((m) => m !== "Unknown").sort((a, b) => (planned[b] ?? 0) - (planned[a] ?? 0));
-  const heat = (m: string, w: number) => setsPerMuscle(sessions, meso.id, w, weightsOf)[m] ?? 0;
+  const heat = (m: string, w: number) => setsPerMuscle(sessions, meso.id, w, weightsOf, myo)[m] ?? 0;
 
   return (
     <div className="stack-lg">
