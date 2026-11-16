@@ -151,8 +151,8 @@ export function ProgramBuilder({ onSave, saveLabel = "Save program", onCancel, i
       <h3>Block</h3>
       <div className="row wrap" style={{ gap: 28 }}>
         <Stepper label="Weeks" value={weeks} min={1} max={16} onChange={setWeeks} />
-        <Stepper label="First week RIR" value={rirStart} min={0} max={5} onChange={setRirStart} />
-        <Stepper label="Last week RIR" value={rirEnd} min={0} max={5} onChange={setRirEnd} />
+        <Stepper label="First week RIR" value={rirStart} min={0} max={20} onChange={setRirStart} />
+        <Stepper label="Last week RIR" value={rirEnd} min={0} max={20} onChange={setRirEnd} />
       </div>
       <label className="row" style={{ gap: 10 }}><input type="checkbox" checked={deload} onChange={(e) => setDeload(e.target.checked)} /><span>Final week is a deload (half the sets, more reps in reserve)</span></label>
       <div className="row">

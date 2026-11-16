@@ -18,13 +18,21 @@ function save(name: string, text: string, type = "text/plain") {
 }
 const csv = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
 
+/** A number box that keeps what you type until you leave it, so 12 can be typed digit by digit. Commits any whole number from min to max. */
+function NumBox({ value, min, max, label, onCommit }: { value: number; min: number; max: number; label: string; onCommit: (n: number) => void }) {
+  const [t, setT] = useState(String(value));
+  useEffect(() => { setT(String(value)); }, [value]);
+  return <input className="input num" style={{ width: 64, flex: "none", textAlign: "center" }} inputMode="numeric" aria-label={label} value={t}
+    onChange={(e) => { const v = e.target.value.replace(/\D/g, "").slice(0, 2); setT(v); if (v !== "") { const n = parseInt(v, 10); if (n >= min && n <= max) onCommit(n); } }}
+    onBlur={() => { const n = parseInt(t, 10); if (!Number.isFinite(n)) setT(String(value)); else { const c = Math.max(min, Math.min(max, n)); setT(String(c)); onCommit(c); } }} />;
+}
+
 function RirTypes() {
   const { settings, setSettings } = useStore();
   const rpe = settings.effort === "rpe";
   const types = settings.rirTypes ?? DEFAULT_RIR_TYPES;
   const put = (t: typeof types) => setSettings({ rirTypes: t });
   const upd = (i: number, p: Partial<(typeof types)[number]>) => put(types.map((t, k) => (k === i ? { ...t, ...p } : t)));
-  const n = (v: string, d: number) => { const x = parseInt(v, 10); return Number.isFinite(x) ? Math.max(0, Math.min(10, x)) : d; };
   return (
     <section className="panel stack" style={{ padding: 16 }} aria-label="RIR types">
       <div><h3>RIR types</h3><p className="dim small">Give each kind of exercise its own effort target across a block. In Plan you choose a type per exercise and per training day, and its {rpe ? "RPE" : "RIR"} moves from the first week to the last build week. A deload week sits above the start.</p></div>
@@ -33,8 +41,8 @@ function RirTypes() {
         {types.map((t, i) => (
           <div key={t.id} className="row" style={{ flexWrap: "nowrap", gap: 6 }}>
             <input className="input" aria-label={`Name of type ${i + 1}`} value={t.name} onChange={(e) => upd(i, { name: e.target.value })} />
-            <input className="input num" style={{ width: 64, flex: "none", textAlign: "center" }} inputMode="numeric" aria-label={`${t.name} first week ${rpe ? "RPE" : "RIR"}`} value={rpe ? 10 - t.start : t.start} onChange={(e) => upd(i, { start: rpe ? 10 - n(e.target.value, 10 - t.start) : n(e.target.value, t.start) })} />
-            <input className="input num" style={{ width: 64, flex: "none", textAlign: "center" }} inputMode="numeric" aria-label={`${t.name} last week ${rpe ? "RPE" : "RIR"}`} value={rpe ? 10 - t.end : t.end} onChange={(e) => upd(i, { end: rpe ? 10 - n(e.target.value, 10 - t.end) : n(e.target.value, t.end) })} />
+            <NumBox label={`${t.name} first week ${rpe ? "RPE" : "RIR"}`} min={0} max={rpe ? 10 : 20} value={rpe ? 10 - t.start : t.start} onCommit={(n) => upd(i, { start: rpe ? 10 - n : n })} />
+            <NumBox label={`${t.name} last week ${rpe ? "RPE" : "RIR"}`} min={0} max={rpe ? 10 : 20} value={rpe ? 10 - t.end : t.end} onCommit={(n) => upd(i, { end: rpe ? 10 - n : n })} />
             <button className="btn ghost icon sm" aria-label={`Remove ${t.name}`} onClick={() => put(types.filter((_, k) => k !== i))}><Trash2 size={16} /></button>
           </div>
         ))}
