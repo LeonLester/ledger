@@ -1,18 +1,26 @@
 import { useMemo, useState, type CSSProperties } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Wand2, X } from "lucide-react";
 import { useStore } from "../store";
 import { muscleColor } from "../lib/groups";
+import { suggestContrib } from "../lib/muscles";
 import { defaultIncrement } from "../lib/math";
+import { DEFAULT_RIR_TYPES } from "../lib/rir";
 import type { ExerciseDef, Unit } from "../types";
+import { Sheet } from "./common";
 
-/** The exercise library as one scrolling table, grouped by the muscle each exercise trains. Every field is editable. */
+const SHARES = [0.25, 0.33, 0.5, 0.75, 1];
+const BW_SHARES = [0, 0.25, 0.33, 0.5, 0.65, 0.75, 0.9, 1];
+const pct = (n: number) => `${Math.round(n * 100)}%`;
+const num = (t: string) => { const n = Number(t.replace(",", ".")); return Number.isFinite(n) ? n : 0; };
+
+/** The exercise library: one row per exercise, grouped by the muscle that limits it. Tap a row to edit everything about it. */
 export function Library() {
-  const { library, setExercise, removeExercise, renameExercise, say } = useStore();
+  const { library, suggestAllContrib, say } = useStore();
   const [q, setQ] = useState("");
   const [muscle, setMuscle] = useState("all");
-  const [adding, setAdding] = useState(false);
-  const [draft, setDraft] = useState<{ name: string; muscle: string; unit: Unit }>({ name: "", muscle: "", unit: "kg" });
-  const muscles = useMemo(() => [...new Set(Object.values(library).map((d) => d.muscle))].sort(), [library]);
+  const [edit, setEdit] = useState<string | "new" | null>(null);
+  const muscles = useMemo(() => [...new Set(Object.values(library).flatMap((d) => [d.muscle, ...Object.keys(d.contrib ?? {})]))].sort(), [library]);
+  const primaries = useMemo(() => [...new Set(Object.values(library).map((d) => d.muscle))].sort(), [library]);
   const groups = useMemo(() => {
     const out = new Map<string, ExerciseDef[]>();
     for (const d of Object.values(library).sort((a, b) => a.name.localeCompare(b.name))) {
@@ -23,48 +31,29 @@ export function Library() {
     return [...out.entries()].sort((a, b) => a[0].localeCompare(b[0]));
   }, [library, q, muscle]);
   const count = groups.reduce((a, [, l]) => a + l.length, 0);
-  const add = () => {
-    const name = draft.name.trim();
-    if (!name) return;
-    if (library[name]) { say("That exercise exists already"); return; }
-    setExercise(name, { muscle: draft.muscle.trim() || "Unknown", unit: draft.unit, increment: defaultIncrement(draft.unit) });
-    setDraft({ name: "", muscle: draft.muscle, unit: draft.unit }); setAdding(false);
-  };
+  const hits = (d: ExerciseDef) => Object.entries(d.contrib ?? {}).map(([m, f]) => `${m} ${pct(f)}`).join(", ");
+  const extras = (d: ExerciseDef) => [d.bwf ? `+${pct(d.bwf)} BW` : "", d.base ? `base ${d.base} kg` : ""].filter(Boolean).join(", ");
   return (
     <section className="panel stack" style={{ padding: 16 }}>
-      <div className="row between"><h3>Exercise library</h3><button className="btn sm" onClick={() => setAdding(!adding)}><Plus size={16} /> Add</button></div>
-      <datalist id="lib-muscles">{muscles.map((m) => <option key={m} value={m} />)}</datalist>
-      {adding && (
-        <div className="stack" style={{ gap: 8 }}>
-          <input className="input" placeholder="Exercise name" aria-label="New exercise name" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
-          <div className="row" style={{ flexWrap: "nowrap" }}>
-            <input className="input" list="lib-muscles" placeholder="Muscle group" aria-label="New exercise muscle" value={draft.muscle} onChange={(e) => setDraft({ ...draft, muscle: e.target.value })} />
-            <select className="input" style={{ width: 84, flex: "none" }} aria-label="New exercise unit" value={draft.unit} onChange={(e) => setDraft({ ...draft, unit: e.target.value as Unit })}><option>kg</option><option>lb</option><option>pin</option></select>
-          </div>
-          <button className="btn primary" onClick={add}>Add to library</button>
-        </div>
-      )}
+      <div className="row between"><h3>Exercise library</h3><button className="btn sm" onClick={() => setEdit("new")}><Plus size={16} /> Add</button></div>
+      <p className="dim small">Each exercise has a primary muscle, the one that fails first, and secondary muscles that earn a share of each set toward their weekly volume. Tap an exercise to edit it.</p>
       <div className="row" style={{ flexWrap: "nowrap" }}>
         <input className="input" placeholder="Find an exercise" aria-label="Find an exercise" value={q} onChange={(e) => setQ(e.target.value)} />
-        <select className="input" style={{ width: 150, flex: "none" }} aria-label="Muscle group filter" value={muscle} onChange={(e) => setMuscle(e.target.value)}>
-          <option value="all">All muscles</option>{muscles.map((m) => <option key={m}>{m}</option>)}
+        <select className="input" style={{ width: 150, flex: "none" }} aria-label="Primary muscle filter" value={muscle} onChange={(e) => setMuscle(e.target.value)}>
+          <option value="all">All muscles</option>{primaries.map((m) => <option key={m}>{m}</option>)}
         </select>
       </div>
       <div className="lib-scroll" tabIndex={0} aria-label="Exercise library table">
         <table className="lib">
-          <thead><tr><th className="lib-n">Exercise</th><th>Muscle</th><th>Unit</th><th>Step</th><th /></tr></thead>
+          <thead><tr><th className="lib-n">Exercise</th><th>Also hits</th><th>Load</th></tr></thead>
           <tbody>
             {groups.map(([m, list]) => [
-              <tr key={`h-${m}`} className="lib-h" style={{ "--mc": muscleColor(m) } as CSSProperties}><td colSpan={5}><b>{m}</b> <span className="faint xs">{list.length}</span></td></tr>,
+              <tr key={`h-${m}`} className="lib-h" style={{ "--mc": muscleColor(m) } as CSSProperties}><td colSpan={3}><span className="sw" /><b>{m}</b> <span className="faint xs">{list.length}</span></td></tr>,
               ...list.map((d) => (
-                <tr key={d.name} style={{ "--mc": muscleColor(d.muscle) } as CSSProperties}>
-                  <td className="lib-n"><input className="lib-in lib-name" aria-label={`Rename ${d.name}`} defaultValue={d.name} key={d.name}
-                    onBlur={(e) => { const v = e.target.value.trim(); if (!v || v === d.name) { e.target.value = d.name; return; } if (library[v] && !confirm(`${v} already exists. Merge ${d.name} into it? Plans and logs are moved over.`)) { e.target.value = d.name; return; } if (renameExercise(d.name, v)) say(`Renamed to ${v}`); }}
-                    onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()} />{d.guessed && <span className="pill warn" style={{ marginLeft: 2 }}>?</span>}</td>
-                  <td><input className="lib-in" list="lib-muscles" aria-label={`${d.name} muscle`} defaultValue={d.muscle} onBlur={(e) => e.target.value.trim() && e.target.value !== d.muscle && setExercise(d.name, { muscle: e.target.value.trim() })} /></td>
-                  <td><select className="lib-in" aria-label={`${d.name} unit`} value={d.unit} onChange={(e) => setExercise(d.name, { unit: e.target.value as Unit })}><option>kg</option><option>lb</option><option>pin</option></select></td>
-                  <td><input className="lib-in num" style={{ width: 56 }} inputMode="decimal" aria-label={`${d.name} load step`} defaultValue={d.increment} onBlur={(e) => setExercise(d.name, { increment: Number(e.target.value.replace(",", ".")) || d.increment })} /></td>
-                  <td><button className="btn ghost icon sm" aria-label={`Remove ${d.name}`} onClick={() => confirm(`Remove ${d.name} from the library? Logged history is kept.`) && removeExercise(d.name)}><Trash2 size={15} /></button></td>
+                <tr key={d.name} className="lib-row" style={{ "--mc": muscleColor(d.muscle) } as CSSProperties} onClick={() => setEdit(d.name)}>
+                  <td className="lib-n"><button className="lib-open" aria-label={`Edit ${d.name}`}>{d.name}{d.guessed && <span className="pill warn" style={{ marginLeft: 6 }}>?</span>}</button></td>
+                  <td className="lib-txt">{hits(d) || <span className="faint">only {d.muscle}</span>}</td>
+                  <td className="lib-txt">{d.unit}{d.increment ? `, step ${d.increment}` : ""}{extras(d) ? `, ${extras(d)}` : ""}</td>
                 </tr>
               )),
             ])}
@@ -72,7 +61,81 @@ export function Library() {
         </table>
         {count === 0 && <p className="dim small" style={{ padding: 14 }}>No exercises match.</p>}
       </div>
-      <p className="faint xs">{count} exercises. Tap a name to rename it everywhere, including past logs. Edit a muscle to move an exercise to another group; type a new name to start a group. Step is how much the app adds once you hit the top of the rep range. Rows marked ? still have a guessed muscle.</p>
+      <div className="row between wrap">
+        <span className="faint xs">{count} exercises. A ? marks a guessed muscle.</span>
+        <button className="btn sm" onClick={() => say(`Added contributors to ${suggestAllContrib()} exercises`)}><Wand2 size={16} /> Suggest contributors</button>
+      </div>
+      {edit && <ExerciseEditor name={edit === "new" ? null : edit} muscles={muscles} onClose={() => setEdit(null)} />}
     </section>
+  );
+}
+
+function ExerciseEditor({ name, muscles, onClose }: { name: string | null; muscles: string[]; onClose: () => void }) {
+  const { library, setExercise, removeExercise, renameExercise, say } = useStore();
+  const def = name ? library[name] : undefined;
+  const [f, setF] = useState({
+    name: def?.name ?? "", muscle: def?.muscle ?? "", unit: (def?.unit ?? "kg") as Unit, step: String(def?.increment ?? 2.5),
+    bwf: def?.bwf ?? 0, base: def?.base ? String(def.base) : "", note: def?.note ?? "", rirType: def?.rirType ?? "",
+  });
+  const types = useStore.getState().settings.rirTypes ?? DEFAULT_RIR_TYPES;
+  const [rows, setRows] = useState<{ m: string; f: number }[]>(Object.entries(def?.contrib ?? {}).map(([m, v]) => ({ m, f: v })));
+  const setRow = (i: number, p: Partial<{ m: string; f: number }>) => setRows(rows.map((r, k) => (k === i ? { ...r, ...p } : r)));
+  const save = () => {
+    const nm = f.name.trim();
+    if (!nm) { say("Give the exercise a name"); return; }
+    if (!f.muscle.trim()) { say("Pick the primary muscle"); return; }
+    let key = name ?? nm;
+    if (name && nm !== name) {
+      if (library[nm] && !confirm(`${nm} already exists. Merge ${name} into it? Plans and logs are moved over.`)) return;
+      renameExercise(name, nm); key = nm;
+    } else if (!name && library[nm]) { say("That exercise exists already"); return; }
+    const contrib = Object.fromEntries(rows.filter((r) => r.m.trim() && r.m.trim() !== f.muscle.trim() && r.f > 0).map((r) => [r.m.trim(), r.f]));
+    setExercise(key, {
+      muscle: f.muscle.trim(), unit: f.unit, increment: num(f.step) || defaultIncrement(f.unit),
+      contrib: Object.keys(contrib).length ? contrib : undefined, bwf: f.bwf || undefined, base: num(f.base) || undefined, note: f.note.trim() || undefined, rirType: f.rirType || undefined,
+    });
+    say(name ? "Saved" : `${nm} added`); onClose();
+  };
+  return (
+    <Sheet title={name ? "Edit exercise" : "New exercise"} onClose={onClose}>
+      <div className="stack">
+        <label className="field"><span>Name</span><input className="input" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></label>
+        <datalist id="ed-muscles">{muscles.map((m) => <option key={m} value={m} />)}</datalist>
+        <label className="field"><span>Primary muscle (the one that fails first)</span><input className="input" list="ed-muscles" value={f.muscle} onChange={(e) => setF({ ...f, muscle: e.target.value })} /></label>
+
+        <div className="stack" style={{ gap: 8 }}>
+          <div className="row between"><b>Also hits</b>
+            <button className="btn ghost sm" onClick={() => { const s = suggestContrib(f.name, f.muscle); if (s) setRows(Object.entries(s).map(([m, v]) => ({ m, f: v }))); else say("No suggestion for this name"); }}><Wand2 size={16} /> Suggest</button></div>
+          <p className="faint xs">Muscles that come close to failure when the primary one fails. The share is how much of a set counts toward that muscle's weekly volume.</p>
+          {rows.map((r, i) => (
+            <div key={i} className="row" style={{ flexWrap: "nowrap", gap: 6 }}>
+              <input className="input" list="ed-muscles" aria-label="Contributing muscle" placeholder="Muscle" value={r.m} onChange={(e) => setRow(i, { m: e.target.value })} />
+              <select className="input" style={{ width: 84, flex: "none" }} aria-label="Share of a set" value={SHARES.includes(r.f) ? r.f : 0.5} onChange={(e) => setRow(i, { f: Number(e.target.value) })}>{SHARES.map((v) => <option key={v} value={v}>{pct(v)}</option>)}</select>
+              <button className="btn ghost icon sm" aria-label="Remove muscle" onClick={() => setRows(rows.filter((_, k) => k !== i))}><X size={16} /></button>
+            </div>
+          ))}
+          <button className="btn sm" style={{ justifySelf: "start" }} onClick={() => setRows([...rows, { m: "", f: 0.5 }])}><Plus size={16} /> Add muscle</button>
+        </div>
+
+        <label className="field"><span>Default RIR type</span><select className="input" value={f.rirType} onChange={(e) => setF({ ...f, rirType: e.target.value })}><option value="">None</option>{types.map((t) => <option key={t.id} value={t.id}>{t.name} ({t.start} to {t.end})</option>)}</select></label>
+        <div className="row" style={{ flexWrap: "nowrap" }}>
+          <label className="field" style={{ width: 90 }}><span>Unit</span><select className="input" value={f.unit} onChange={(e) => setF({ ...f, unit: e.target.value as Unit })}><option>kg</option><option>lb</option><option>pin</option></select></label>
+          <label className="field" style={{ flex: 1 }}><span>Load step</span><input className="input num" inputMode="decimal" value={f.step} onChange={(e) => setF({ ...f, step: e.target.value })} /></label>
+        </div>
+
+        <div className="stack" style={{ gap: 8 }}>
+          <b>Body and machine load</b>
+          <label className="field"><span>Bodyweight counts as</span>
+            <select className="input" value={f.bwf} onChange={(e) => setF({ ...f, bwf: Number(e.target.value) })}>{BW_SHARES.map((v) => <option key={v} value={v}>{v === 0 ? "Nothing" : pct(v) + " of bodyweight"}</option>)}</select></label>
+          <label className="field"><span>Weight of the machine or implement, in kg</span><input className="input num" inputMode="decimal" placeholder="0" value={f.base} onChange={(e) => setF({ ...f, base: e.target.value })} /></label>
+          <p className="faint xs">What you log is added to these. Log a negative weight such as -20 for an assisted pull-up. Estimated 1RM, records and tonnage use the total.</p>
+        </div>
+
+        <label className="field"><span>Note shown every time you log this exercise</span><textarea className="input" style={{ minHeight: 84, padding: 10 }} value={f.note} onChange={(e) => setF({ ...f, note: e.target.value })} placeholder="Seat setting, grip, pin position" /></label>
+
+        <button className="btn primary" onClick={save}>{name ? "Save" : "Add to library"}</button>
+        {name && <button className="btn danger" onClick={() => confirm(`Remove ${name} from the library? Logged history is kept.`) && (removeExercise(name), onClose())}><Trash2 size={16} /> Remove from library</button>}
+      </div>
+    </Sheet>
   );
 }

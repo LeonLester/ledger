@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useData } from "../lib/view";
 import { LIFTS, LIFT_LABEL, LIFT_NAME } from "../data/catalog";
-import { bestE1rm, fmtW, topSet, workedSets } from "../lib/math";
+import { bestE1rm, fmtW, kgLoad, topSet, workedSets } from "../lib/math";
 import { PR_LABEL, repMax, sessionPrs } from "../lib/pr";
 import { sessionDate, sortSessions } from "../lib/selectors";
 import type { LiftKey } from "../types";
@@ -45,10 +45,11 @@ export function Strength() {
       const key = `${s.meso}-${s.week}`;
       const o = m.get(key) ?? { label: `M${s.meso.slice(1)} W${s.week}`, sets: 0, reps: 0, ton: 0, rir: [], int: [], tech: [] };
       for (const x of workedSets(e)) {
-        if (x.weight == null) continue;
-        o.sets++; o.reps += x.reps!; o.ton += x.weight * x.reps!;
+        const kg = kgLoad(e, x);
+        if (kg == null || kg <= 0) continue;
+        o.sets++; o.reps += x.reps!; o.ton += kg * x.reps!;
         if (x.rir != null) o.rir.push(x.rir);
-        if (best[sel] > 0 && e.unit !== "pin") o.int.push(x.weight / best[sel]);
+        if (best[sel] > 0 && e.unit !== "pin") o.int.push(kg / best[sel]);
       }
       if (e.tech) o.tech.push(e.tech);
       m.set(key, o);
@@ -113,8 +114,8 @@ export function Records() {
   const table = useMemo(() => {
     const best: Record<number, { w: number; where: string }> = {};
     for (const s of done) for (const e of s.exercises) if (e.exercise === ex && e.unit !== "pin") for (const x of workedSets(e)) {
-      if (x.weight == null || x.reps! > 12) continue;
-      const w = e.unit === "lb" ? x.weight * 0.45359 : x.weight;
+      const w = kgLoad(e, x);
+      if (w == null || w <= 0 || x.reps! > 12) continue;
       if (!best[x.reps!] || w > best[x.reps!].w) best[x.reps!] = { w, where: `M${s.meso.slice(1)} W${s.week}` };
     }
     return best;

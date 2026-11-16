@@ -6,6 +6,11 @@ import { sessionPrs } from "../src/lib/pr.ts";
 import { parseSets } from "../src/lib/sheet.ts";
 import { linkPrev, relabel, runs, muscleColor } from "../src/lib/groups.ts";
 import { sampleYear } from "../src/data/sampleYear.ts";
+import { tr as gr } from "../src/i18n/index.ts";
+import { rirForType, DEFAULT_RIR_TYPES } from "../src/lib/rir.ts";
+import { kgLoad, bestE1rm } from "../src/lib/math.ts";
+import { setsPerMuscle } from "../src/lib/selectors.ts";
+import { suggestContrib } from "../src/lib/muscles.ts";
 import { expand, expandLayouts } from "../src/lib/expand.ts";
 import { setFormulas, est1rm, weightForReps, checkFormula, compile, score, parseWarm } from "../src/lib/formulas.ts";
 
@@ -150,6 +155,24 @@ for (const t of TEMPLATES) {
   ok(names(r.weeks[1]) === "La,Ua" && r.weeks[1].split[0].session === "La", "builder: even weeks use the second layout");
   const plain = expandLayouts([mk("Ua"), mk("La")], 2, 3, 1, false, lay("Ua", "La"), null);
   ok(!plain.weeks[0].split && names(plain.weeks[0]) === "Ua,La", "builder: plain week stays unchanged");
+}
+{
+  ok(gr("Week 2 of 5") === "Εβδομάδα 2 από 5" && gr("6 exercises, 12 sets, Chest, shoulders, triceps") === "6 ασκήσεις, 12 σετ, Στήθος, ώμοι, τρικέφαλοι", "greek: numbers in text");
+  ok(gr(" Train ") === " Προπόνηση " && gr("Not a known string") === "Not a known string", "greek: spacing kept, unknown stays English");
+  const tech = DEFAULT_RIR_TYPES[0]; // 6 to 3
+  const seq = [1, 2, 3, 4, 5].map((w) => rirForType(tech, w, 5, true));
+  ok(seq.join() === "6,5,4,3,7", "RIR type moves first week to last, deload above start: " + seq);
+  ok(rirForType(DEFAULT_RIR_TYPES[2], 4, 5, true) === 0 && rirForType(DEFAULT_RIR_TYPES[1], 1, 4, false) === 4, "RIR type ends");
+  const withTypes = expand([{ name: "A", items: [{ letter: "A", exercise: "Curl", sets: 3, repLo: 8, repHi: 12, rir: 2, rirType: "isolation" }, { letter: "B", exercise: "Press", sets: 3, repLo: 6, repHi: 10, rir: 2 }] }], 5, 3, 1, true, DEFAULT_RIR_TYPES);
+  ok(withTypes.map((w) => w.sessions[0].items[0].rir).join() === "3,2,1,0,4" && withTypes.map((w) => w.sessions[0].items[1].rir).join() === "3,2,2,1,4", "typed items follow their type, others the program default");
+  const pull = { letter: "A", exercise: "Pull-Up", unit: "kg", rir: 1, note: null, bwf: 1, bw: 80, sets: [{ weight: -20, reps: 8, myo: [] }, { weight: 0, reps: 5, myo: [] }] };
+  ok(kgLoad(pull, pull.sets[0]) === 60 && kgLoad(pull, pull.sets[1]) === 80, "assisted pull-up counts bodyweight minus assistance");
+  const sled = { letter: "A", exercise: "Leg Press", unit: "kg", rir: 1, note: null, base: 45, sets: [{ weight: 100, reps: 10, myo: [] }] };
+  ok(kgLoad(sled, sled.sets[0]) === 145 && bestE1rm(sled) > 145, "machine base weight is added");
+  const wt = (ex) => ex === "Bench" ? [["Chest", 1], ["Triceps", 0.33]] : [["Biceps", 1]];
+  const vol = setsPerMuscle([{ id: "s", meso: "m1", week: 1, exercises: [{ exercise: "Bench", sets: [{ reps: 8 }, { reps: 8 }, { reps: 8 }] }] }], "m1", 1, wt);
+  ok(vol.Chest === 3 && Math.abs(vol.Triceps - 0.99) < 1e-9, "contributor muscles earn a share of each set");
+  ok(suggestContrib("Barbell Bench Press", "Chest")?.["Triceps (long head)"] === 0.33 && suggestContrib("Lat Pulldown", "Mid Back")?.Biceps === 0.33, "contributor suggestions");
 }
 console.log(fails ? `\n${fails} failed` : "\nall passed");
 process.exit(fails ? 1 : 0);

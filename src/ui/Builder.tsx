@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, Link2, Plus, Trash2, Unlink2 } from "lucide-react";
 import { linkPrev, muscleColor, prefix, runs } from "../lib/groups";
+import { DEFAULT_RIR_TYPES, rirForType } from "../lib/rir";
 import { useStore } from "../store";
 import { buildSplit, TEMPLATES, WEEKDAYS, type Generated, type SplitRow } from "../data/templates";
 import { expand, expandLayouts, relabel } from "../lib/expand";
@@ -15,6 +16,8 @@ export function SessionsEditor({ sessions, onChange }: { sessions: PlanSession[]
   const names = useStore((s) => Object.keys(s.library).sort());
   const effort = useStore((s) => s.settings.effort ?? "rir");
   const muscleOf = useStore((s) => s.muscleOf);
+  const types = useStore((s) => s.settings.rirTypes) ?? DEFAULT_RIR_TYPES;
+  const library = useStore((s) => s.library);
   const setSess = (i: number, fn: (s: PlanSession) => PlanSession) => onChange(sessions.map((s, k) => (k === i ? fn(s) : s)));
   const setItem = (i: number, j: number, patch: Partial<PlanItem>) => setSess(i, (s) => ({ ...s, items: s.items.map((it, k) => (k === j ? { ...it, ...patch } : it)) }));
   const move = (i: number, j: number, d: number) => setSess(i, (s) => { const a = [...s.items]; const t = j + d; if (t < 0 || t >= a.length) return s; [a[j], a[t]] = [a[t], a[j]]; return { ...s, items: relabel(a) }; });
@@ -37,12 +40,17 @@ export function SessionsEditor({ sessions, onChange }: { sessions: PlanSession[]
                   <span className="letter" style={{ background: `color-mix(in srgb, ${muscleColor(muscleOf(it.exercise))} 55%, var(--s1))`, color: "#0b0d10", borderColor: muscleColor(muscleOf(it.exercise)) }}>{it.letter === "~" ? "A1" : it.letter}</span>
                   {j > 0 && <button className="btn ghost sm" aria-pressed={linked} aria-label={linked ? "Remove from superset" : "Superset with the exercise above"} onClick={() => setSess(i, (x) => ({ ...x, items: linkPrev(x.items, j, !linked) }))}>{linked ? <Unlink2 size={16} color="var(--accent)" /> : <Link2 size={16} />}{linked ? "Unlink" : "Superset"}</button>}
                 </div>
-                <input className="input" list="ex-names" placeholder="Exercise" aria-label="Exercise" value={it.exercise} onChange={(e) => setItem(i, j, { exercise: e.target.value })} />
+                <input className="input" list="ex-names" placeholder="Exercise" aria-label="Exercise" value={it.exercise} onChange={(e) => { const d = library[e.target.value]; setItem(i, j, { exercise: e.target.value, ...(d?.rirType && !it.rirType && types.some((t) => t.id === d.rirType) ? { rirType: d.rirType } : {}) }); }} />
                 <div className="row" style={{ gap: 8, alignItems: "end", flexWrap: "wrap" }}>
                   <label className="field" style={{ width: 58 }}><span className="xs">Sets</span><input className="input num" inputMode="numeric" value={it.sets} onChange={(e) => setItem(i, j, { sets: Math.max(1, num(e.target.value, 1) ?? 1) })} /></label>
                   <label className="field" style={{ width: 58 }}><span className="xs">Reps</span><input className="input num" inputMode="numeric" aria-label="Reps from" value={it.repLo ?? ""} onChange={(e) => setItem(i, j, { repLo: num(e.target.value, null) })} /></label>
                   <label className="field" style={{ width: 58 }}><span className="xs">To</span><input className="input num" inputMode="numeric" aria-label="Reps to" value={it.repHi ?? ""} onChange={(e) => setItem(i, j, { repHi: num(e.target.value, null) })} /></label>
-                  <label className="field" style={{ width: 58 }}><span className="xs">{effort.toUpperCase()}</span><input className="input num" inputMode="numeric" aria-label={effort.toUpperCase()} value={it.rir ?? ""} onChange={(e) => setItem(i, j, { rir: num(e.target.value, null) })} /></label>
+                  {it.rirType && types.find((t) => t.id === it.rirType)
+                    ? <div className="field" style={{ width: 84 }}><span className="xs">{effort.toUpperCase()}</span><div className="input num rir-fixed" aria-label={`${effort.toUpperCase()} follows the type`}>{(() => { const t = types.find((x) => x.id === it.rirType)!; return effort === "rpe" ? `${10 - t.start} to ${10 - t.end}` : `${t.start} to ${t.end}`; })()}</div></div>
+                    : <label className="field" style={{ width: 58 }}><span className="xs">{effort.toUpperCase()}</span><input className="input num" inputMode="numeric" aria-label={effort.toUpperCase()} value={it.rir ?? ""} onChange={(e) => setItem(i, j, { rir: num(e.target.value, null) })} /></label>}
+                  <label className="field" style={{ flex: 1, minWidth: 110 }}><span className="xs">RIR type</span>
+                    <select className="input" aria-label="RIR type" value={it.rirType ?? ""} onChange={(e) => setItem(i, j, { rirType: e.target.value || undefined })}>
+                      <option value="">Program default</option>{types.map((t) => <option key={t.id} value={t.id}>{t.name} ({t.start} to {t.end})</option>)}</select></label>
                   <div className="row" style={{ gap: 0, flexWrap: "nowrap", marginLeft: "auto" }}>
                     <button className="btn ghost icon sm" aria-label="Move up" disabled={j === 0} onClick={() => move(i, j, -1)}><ArrowUp size={16} /></button>
                     <button className="btn ghost icon sm" aria-label="Move down" disabled={j === s.items.length - 1} onClick={() => move(i, j, 1)}><ArrowDown size={16} /></button>
@@ -120,7 +128,7 @@ export function ProgramBuilder({ onSave, saveLabel = "Save program", onCancel, i
     const clean = sessions.map((s) => ({ ...s, name: s.name.trim() }));
     const fix = (rows: SplitRow[]) => rows.map((r) => ({ ...r, session: clean.some((s) => s.name === r.session.trim()) ? r.session.trim() : REST }));
     const second = rotate ? fix(splitB ?? days) : null;
-    const g = expandLayouts(clean, weeks, rirStart, rirEnd, deload, fix(days), second);
+    const g = expandLayouts(clean, weeks, rirStart, rirEnd, deload, fix(days), second, useStore.getState().settings.rirTypes ?? DEFAULT_RIR_TYPES);
     return onSave((id): Generated => ({ meso: { id, name: name.trim(), weeks: g.weeks }, split: g.split, mode: "feedback", effort: "rir" }));
   };
   return (
@@ -159,11 +167,14 @@ export function MesoEditor({ meso, week, onClose }: { meso: Meso; week: number; 
   const [scope, setScope] = useState<"week" | "from" | "all">("from");
   const apply = () => {
     const clean = sessions.map((s) => ({ ...s, name: s.name.trim() || "Session", items: relabel(s.items.filter((i) => i.exercise.trim())) }));
+    const types = useStore.getState().settings.rirTypes ?? DEFAULT_RIR_TYPES;
+    const total = meso.weeks.length, hasDeload = meso.deload !== false;
+    const typedRir = <T extends PlanItem>(it: T, wk: number): T => { const t = it.rirType ? types.find((x) => x.id === it.rirType) : undefined; return t ? { ...it, rir: rirForType(t, wk, total, hasDeload) } : it; };
     const weeks = meso.weeks.map((w) => {
       const hit = scope === "all" || (scope === "week" ? w.week === week : w.week >= week);
       if (!hit) return w;
       // keep each week's own RIR and set count when the exercise already existed there
-      return { ...w, sessions: clean.map((s) => ({ ...s, items: s.items.map((it) => { const old = w.sessions.flatMap((x) => x.items).find((o) => o.exercise === it.exercise); return w.week === week || !old ? it : { ...it, rir: old.rir, sets: scope === "all" ? old.sets : it.sets }; }) })) };
+      return { ...w, sessions: clean.map((s) => ({ ...s, items: s.items.map((it) => { const old = w.sessions.flatMap((x) => x.items).find((o) => o.exercise === it.exercise); const base = w.week === week || !old ? it : { ...it, rir: old.rir, sets: scope === "all" ? old.sets : it.sets }; return typedRir(base, w.week); }) })) };
     });
     addLibrary(clean.flatMap((s) => s.items.map((i) => i.exercise)));
     saveMeso({ ...meso, weeks });

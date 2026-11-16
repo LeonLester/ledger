@@ -7,7 +7,7 @@ import { cancelRest, primeAlarm, scheduleRest } from "./native";
 import { linkPrev, relabel, runs } from "./lib/groups";
 import type { Adjustment, BodyWeight, ExerciseDef, ExLog, Feedback, Meso, Seed, Session, Settings, SetLog, Unit } from "./types";
 import { defaultIncrement, isoDate, uid, worked } from "./lib/math";
-import { coarse, guessMuscle } from "./lib/muscles";
+import { coarse, guessMuscle, suggestContrib } from "./lib/muscles";
 import { effectiveSessions, feedbackDelta, mrvFor, suggestTarget, weekTarget } from "./lib/progression";
 import { lastLog, mesoNum } from "./lib/selectors";
 import { CAT, LIFT_NAME } from "./data/catalog";
@@ -50,12 +50,18 @@ interface State {
   loadSampleYear(templateId: string): Promise<void>;
   setSettings(p: Partial<Settings>): void;
   muscleOf(ex: string): string;
+  /** [muscle, share of a set] for an exercise: the primary muscle at 1, then its contributors */
+  weightsOf(ex: string): [string, number][];
+  /** bodyweight and base-weight fields copied onto a new logged exercise */
+  extrasOf(ex: string): Pick<ExLog, "bwf" | "base" | "bw">;
+  suggestAllContrib(): number;
   startSession(week: number, name: string): string;
   closeSession(): void;
   updateEx(sessionId: string, idx: number, fn: (e: ExLog) => ExLog): void;
   toggleSet(sessionId: string, exIdx: number, setIdx: number): void;
   addExercise(sessionId: string, name: string, link?: boolean): void;
   linkExercise(sessionId: string, idx: number, link: boolean): void;
+  setSessionNote(sessionId: string, note: string): void;
   removeExercise(name: string): void;
   renameExercise(from: string, to: string): boolean;
   finishSession(id: string, fb: Record<string, { pump: number; workload: number }>): void;
@@ -83,7 +89,7 @@ export const useStore = create<State>((set, get) => ({
     for (const name of names) {
       if (!name || lib[name]) continue;
       const base = CAT[name.replace(/ \(T2\)$/, "")];
-      lib[name] = { name, muscle: base?.muscle ?? guessMuscle(name), unit: base?.unit ?? "kg", increment: base?.inc ?? defaultIncrement("kg") }; n++;
+      { const muscle = base?.muscle ?? guessMuscle(name); const contrib = suggestContrib(name, muscle); lib[name] = { name, muscle, unit: base?.unit ?? "kg", increment: base?.inc ?? defaultIncrement("kg"), ...(contrib ? { contrib } : {}) }; n++; }
     }
     if (n) { set({ library: lib }); void db.kv.put({ key: "library", value: lib }); }
   },
@@ -98,7 +104,7 @@ export const useStore = create<State>((set, get) => ({
     const has = base.exercises.some((e) => e.exercise === exercise);
     const plannedItem = planned?.items.find((i) => i.exercise === exercise);
     const exercises = has ? base.exercises.map((e) => (e.exercise === exercise ? { ...e, sets } : e))
-      : [...base.exercises, { letter: plannedItem?.letter ?? String.fromCharCode(65 + base.exercises.length), exercise, unit: library[exercise]?.unit ?? "kg", rir: plannedItem?.rir ?? null, note: null, sets } as ExLog];
+      : [...base.exercises, { letter: plannedItem?.letter ?? String.fromCharCode(65 + base.exercises.length), exercise, unit: library[exercise]?.unit ?? "kg", rir: plannedItem?.rir ?? null, note: null, sets, ...get().extrasOf(exercise) } as ExLog];
     const next: Session = { ...base, exercises: exercises.filter((e) => e.sets.length > 0 || e.exercise !== exercise) };
     set({ sessions: found ? sessions.map((s) => (s.id === id ? next : s)) : [...sessions, next] });
     persistSession(next);
@@ -206,6 +212,22 @@ export const useStore = create<State>((set, get) => ({
     void db.settings.put({ ...settings, key: "main" });
   },
   muscleOf(ex) { return get().library[ex]?.muscle ?? guessMuscle(ex); },
+  weightsOf(ex) {
+    const d = get().library[ex]; const m = d?.muscle ?? guessMuscle(ex);
+    return [[m, 1], ...Object.entries(d?.contrib ?? {}).filter(([k, v]) => k !== m && v > 0) as [string, number][]];
+  },
+  extrasOf(ex) {
+    const d = get().library[ex]; const out: Pick<ExLog, "bwf" | "base" | "bw"> = {};
+    if (d?.bwf) { out.bwf = d.bwf; const bw = get().bodyweight; out.bw = bw.length ? [...bw].sort((a, b) => a.date.localeCompare(b.date))[bw.length - 1].kg : null; }
+    if (d?.base) out.base = d.base;
+    return out;
+  },
+  suggestAllContrib() {
+    const lib = { ...get().library }; let n = 0;
+    for (const d of Object.values(lib)) { if (d.contrib) continue; const c = suggestContrib(d.name, d.muscle); if (c) { lib[d.name] = { ...d, contrib: c }; n++; } }
+    if (n) { set({ library: lib }); void db.kv.put({ key: "library", value: lib }); }
+    return n;
+  },
 
   startSession(week, name) {
     const { mesos, settings, sessions, library } = get();
@@ -227,7 +249,7 @@ export const useStore = create<State>((set, get) => ({
         const w = it.pct != null && tm ? wFor(it.pct) : tgt.weight;
         sets = Array.from({ length: Math.max(1, it.sets) }, () => ({ weight: w, reps: null, myo: [] }));
       }
-      return { letter: it.letter, exercise: it.exercise, unit: def?.unit ?? "kg", rir: it.rir, note: null, sets };
+      return { letter: it.letter, exercise: it.exercise, unit: def?.unit ?? "kg", rir: it.rir, note: null, sets, ...get().extrasOf(it.exercise) };
     });
     const s: Session = { id, athleteId: settings.athleteId, meso: settings.activeMeso, week, name, date: isoDate(new Date()), status: "active", exercises, started: Date.now() };
     set({ sessions: [...sessions, s], openSession: id });
@@ -274,6 +296,10 @@ export const useStore = create<State>((set, get) => ({
     if (liftMap) void db.settings.put({ ...settings, key: "main" });
     return true;
   },
+  setSessionNote(sessionId, note) {
+    const sessions = get().sessions.map((x) => { if (x.id !== sessionId) return x; const n = { ...x, note: note || undefined }; persistSession(n); return n; });
+    set({ sessions });
+  },
   removeExercise(name) {
     const library = { ...get().library }; delete library[name];
     set({ library }); void db.kv.put({ key: "library", value: library });
@@ -284,7 +310,7 @@ export const useStore = create<State>((set, get) => ({
     const w = lg?.sets[0]?.weight ?? null;
     const next = sessions.map((s) => {
       if (s.id !== sessionId) return s;
-      const ex: ExLog = { letter: "~", exercise: name, unit: library[name]?.unit ?? "kg", rir: 2, note: null, sets: [{ weight: w, reps: null, myo: [] }, { weight: w, reps: null, myo: [] }] };
+      const ex: ExLog = { letter: "~", exercise: name, ...get().extrasOf(name), unit: library[name]?.unit ?? "kg", rir: 2, note: null, sets: [{ weight: w, reps: null, myo: [] }, { weight: w, reps: null, myo: [] }] };
       const all = [...s.exercises, ex];
       const n = { ...s, exercises: link && s.exercises.length ? linkPrev(all, all.length - 1, true) : relabel(all) };
       persistSession(n);

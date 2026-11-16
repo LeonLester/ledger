@@ -18,6 +18,14 @@ function RepsCell({ s, placeholder, onChange }: { s: SetLog; placeholder: string
     onChange={(e) => { setT(e.target.value); const p = parseReps(e.target.value); if (p) onChange(p); }} />;
 }
 
+/** Weight with a local text state, so a minus sign or a trailing decimal point survives typing. Negative weights are for assistance. */
+function WeightCell({ value, placeholder, label, text, onChange }: { value: number | null; placeholder: string; label: string; text: boolean; onChange: (v: number | null) => void }) {
+  const [t, setT] = useState(value == null ? "" : String(value));
+  useEffect(() => { if ((t === "" ? null : Number(t.replace(",", "."))) !== value && !/^-?\d*[.,]?$/.test(t)) setT(value == null ? "" : String(value)); /* eslint-disable-next-line */ }, [value]);
+  return <input className="cell" inputMode={text ? "text" : "decimal"} aria-label={label} placeholder={placeholder} value={t}
+    onChange={(e) => { const v = e.target.value; if (!/^-?\d*[.,]?\d*$/.test(v)) return; setT(v); const n = Number(v.replace(",", ".")); onChange(v === "" ? null : Number.isFinite(n) && !/^-?[.,]?$/.test(v) ? n : value); }} />;
+}
+
 function EffCell({ rir, rpe, placeholder, label, onChange }: { rir: number | null | undefined; rpe: boolean; placeholder: string; label: string; onChange: (v: number | null) => void }) {
   const show = rir == null ? "" : String(rpe ? 10 - rir : rir);
   const parse = (t: string) => (t === "" ? null : rpe ? 10 - Number(t) : Number(t));
@@ -35,6 +43,7 @@ export function SessionView({ id }: { id: string }) {
   const [finishing, setFinishing] = useState(false);
   const [adding, setAdding] = useState(false);
   const [linkNew, setLinkNew] = useState(false);
+  const [sessionNote, setSessionNote] = useState(false);
   const meso = mesos.find((m) => m.id === sess?.meso);
   const plan = useMemo(() => (meso && sess ? effectiveSessions(meso, sess.week, adjustments, muscleOf).find((p) => p.name === sess.name) : undefined), [meso, sess?.week, sess?.name, adjustments]);
   const prs = useMemo(() => (sess ? sessionPrs(sess, sessions, bodyweight, { mesoStart: settings.mesoStart, split }, sess.status === "active") : []), [sess, sessions, bodyweight]);
@@ -58,6 +67,15 @@ export function SessionView({ id }: { id: string }) {
       </header>
 
       <SessionComments sessionId={id} />
+      <button className="note-line session-note" onClick={() => setSessionNote(true)} aria-label="Session note">
+        {sess.note ? <span><b>Session:</b> {sess.note}</span> : <span className="faint">{readOnly ? "No session note" : "Add a note for this session"}</span>}
+      </button>
+      {sessionNote && (
+        <Sheet title="Session note" onClose={() => setSessionNote(false)}>
+          <textarea className="input" style={{ minHeight: 110, padding: 10 }} defaultValue={sess.note ?? ""} placeholder="Sleep, energy, injuries, gym crowd, anything that explains the day" onBlur={(e) => st.setSessionNote(id, e.target.value.trim())} />
+          <button className="btn primary" onClick={() => setSessionNote(false)}>Done</button>
+        </Sheet>
+      )}
 
       {needSoreness.length > 0 && (
         <section className="panel stack" style={{ padding: 16, marginBottom: 14 }} aria-label="Soreness check">
@@ -88,17 +106,23 @@ export function SessionView({ id }: { id: string }) {
             <div className="ex-head">
               <span className="letter" style={{ background: `color-mix(in srgb, ${col} 55%, var(--s1))`, color: "#0b0d10", borderColor: col }}>{ex.letter}</span>
               <div className="ex-name">{ex.exercise}</div>
-              <div className="ex-sub dim xs"><span>{muscleOf(ex.exercise)}{ex.rir != null ? `, plan ${rpeMode ? "RPE" : "RIR"} ${rpeMode ? 10 - ex.rir : ex.rir}` : ""}</span>
+              <div className="ex-sub dim xs"><span>{muscleOf(ex.exercise)}{ex.rir != null ? `, plan ${rpeMode ? "RPE" : "RIR"} ${rpeMode ? 10 - ex.rir : ex.rir}` : ""}{ex.bwf ? `, +${Math.round(ex.bwf * 100)}% bodyweight${ex.bw ? ` (${fmtW(ex.bw)} kg)` : ""}` : ""}{ex.base ? `, +${fmtW(ex.base)} kg base` : ""}</span>
               <div className="row tools">
                 {i > 0 && !readOnly && <button className="btn ghost icon sm" aria-label={g.pos > 0 ? "Remove from superset" : "Superset with the exercise above"} onClick={() => st.linkExercise(id, i, g.pos === 0)}>{g.pos > 0 ? <Unlink2 size={17} color="var(--accent)" /> : <Link2 size={17} />}</button>}
                 <button className="btn ghost icon sm" aria-label="Warm-up sets" onClick={() => setMenu({ i, kind: "warm" })}><Flame size={17} /></button>
                 <button className="btn ghost icon sm" aria-label="Plate calculator" onClick={() => setMenu({ i, kind: "plates" })}><Disc3 size={17} /></button>
                 <button className="btn ghost icon sm" aria-label="Swap exercise" onClick={() => setMenu({ i, kind: "swap" })}><Repeat size={17} /></button>
-                <button className="btn ghost icon sm" aria-label="Note" onClick={() => setMenu({ i, kind: "note" })}><StickyNote size={17} color={ex.note ? "var(--accent)" : undefined} /></button>
+                <button className="btn ghost icon sm" aria-label="Note" onClick={() => setMenu({ i, kind: "note" })}><StickyNote size={17} color={ex.note || def?.note ? "var(--accent)" : undefined} /></button>
                 <button className="btn ghost icon sm" aria-label="Technique and bar path" onClick={() => setMenu({ i, kind: "tech" })}><Video size={17} color={ex.tech || ex.paths?.length ? "var(--accent)" : undefined} /></button>
               </div>
               </div>
             </div>
+            {(def?.note || ex.note) && (
+              <button className="note-line" onClick={() => setMenu({ i, kind: "note" })} aria-label={`Edit notes for ${ex.exercise}`}>
+                {def?.note && <span><b>Always:</b> {def.note}</span>}
+                {ex.note && <span><b>Today:</b> {ex.note}</span>}
+              </button>
+            )}
             {item?.desc && <div className="target"><span>Prescribed <b>{item.desc}</b></span></div>}
             {tgt && !item?.scheme && !(item?.pct != null && item.lift && settings.tms?.[item.lift]) && (
               <div className="target">
@@ -115,8 +139,7 @@ export function SessionView({ id }: { id: string }) {
                   <div key={j} className={`set ${s.done ? "done" : ""}`}>
                     <span className="n num">{j + 1}</span>
                     <span className="prev num">{p && p.reps != null ? `${fmtW(p.weight) || "-"}x${repsText(p)}` : "-"}</span>
-                    <input className="cell" inputMode="decimal" aria-label={`Set ${j + 1} weight`} value={s.weight ?? ""} placeholder={fmtW(p?.weight ?? null) || "0"}
-                      onChange={(e) => patchSet(i, j, { weight: e.target.value === "" ? null : Number(e.target.value.replace(",", ".")) })} />
+                    <WeightCell value={s.weight} text={!!ex.bwf} label={`Set ${j + 1} weight`} placeholder={fmtW(p?.weight ?? null) || "0"} onChange={(v) => patchSet(i, j, { weight: v })} />
                     <RepsCell s={s} placeholder={s.tr ? `${s.tr}${s.amrap ? "+" : ""}` : item?.repLo ? String(item.repLo) : "0"} onChange={(v) => patchSet(i, j, v)} />
                     <EffCell rir={s.rir} rpe={rpeMode} label={`Set ${j + 1} ${rpeMode ? "RPE" : "reps in reserve"}`} placeholder={ex.rir != null ? String(rpeMode ? 10 - ex.rir : ex.rir) : "-"} onChange={(v) => patchSet(i, j, { rir: v })} />
                     <button className={`disc ${rirClass}`} aria-pressed={!!s.done} aria-label={`Set ${j + 1} done`} onClick={() => toggleSet(id, i, j)}>
@@ -147,9 +170,13 @@ export function SessionView({ id }: { id: string }) {
               <Sheet title="Plate calculator" onClose={() => setMenu(null)}><PlateCalc start={first} unit={unit} /></Sheet>
             )}
             {menu?.i === i && menu.kind === "note" && (
-              <Sheet title={`Note: ${ex.exercise}`} onClose={() => setMenu(null)}>
-                <textarea className="input" style={{ minHeight: 110, padding: 12 }} defaultValue={ex.note ?? ""} placeholder="Cues, seat setting, pin position, form fault" onBlur={(e) => updateEx(id, i, (x) => ({ ...x, note: e.target.value || null }))} />
-                <button className="btn primary" onClick={() => setMenu(null)}>Save note</button>
+              <Sheet title={`Notes: ${ex.exercise}`} onClose={() => setMenu(null)}>
+                <label className="field"><span>Always show for this exercise</span>
+                  <textarea className="input" style={{ minHeight: 84, padding: 10 }} defaultValue={def?.note ?? ""} placeholder="Seat setting, grip, pin position, cues" onBlur={(e) => st.setExercise(ex.exercise, { note: e.target.value.trim() || undefined })} /></label>
+                <label className="field"><span>Only this session</span>
+                  <textarea className="input" style={{ minHeight: 84, padding: 10 }} defaultValue={ex.note ?? ""} placeholder="How it felt today, what to change" onBlur={(e) => updateEx(id, i, (x) => ({ ...x, note: e.target.value.trim() || null }))} /></label>
+                <p className="faint xs">Both show on the logger as soon as they are written. The first one returns every time you log this exercise.</p>
+                <button className="btn primary" onClick={() => setMenu(null)}>Done</button>
               </Sheet>
             )}
             {menu?.i === i && menu.kind === "tech" && <TechSheet id={id} i={i} onClose={() => setMenu(null)} />}
@@ -158,7 +185,7 @@ export function SessionView({ id }: { id: string }) {
                 <p className="dim small">Same muscle ({muscleOf(ex.exercise)}). Loads reset to the new lift's history.</p>
                 <div className="list">{Object.values(library).filter((d) => d.muscle === muscleOf(ex.exercise) && d.name !== ex.exercise).map((d) => {
                   const lg = lastLog(d.name, sessions, sess);
-                  return <button key={d.name} className="sess-row" onClick={() => { updateEx(id, i, (x) => ({ ...x, exercise: d.name, unit: d.unit, sets: x.sets.map((s) => ({ ...s, weight: lg ? lg.sets[0]?.weight ?? null : null, reps: null, myo: [], done: false })) })); setMenu(null); }}>
+                  return <button key={d.name} className="sess-row" onClick={() => { updateEx(id, i, (x) => ({ ...x, bwf: undefined, base: undefined, bw: undefined, ...st.extrasOf(d.name), exercise: d.name, unit: d.unit, sets: x.sets.map((s) => ({ ...s, weight: lg ? lg.sets[0]?.weight ?? null : null, reps: null, myo: [], done: false })) })); setMenu(null); }}>
                     <div><div className="ex-name" style={{ fontSize: "1.2rem" }}>{d.name}</div><div className="dim small">{lg ? `Last ${fmtW(lg.sets[0]?.weight)}x${lg.sets[0]?.reps}` : "No history"}</div></div></button>;
                 })}</div>
               </Sheet>

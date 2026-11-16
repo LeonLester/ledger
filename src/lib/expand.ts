@@ -1,14 +1,17 @@
-import type { PlanSession } from "../types";
+import type { PlanSession, RirType } from "../types";
 import { relabel } from "./groups";
+import { rirForType } from "./rir";
 export { relabel };
 
+const typed = (it: { rirType?: string }, week: number, weeks: number, deload: boolean, types: RirType[]) => { const t = it.rirType ? types.find((x) => x.id === it.rirType) : undefined; return t ? rirForType(t, week, weeks, deload) : undefined; };
+
 /** Expands one template week into a whole block: RIR moves from `rirStart` to `rirEnd`, optional deload week. */
-export function expand(base: PlanSession[], weeks: number, rirStart: number, rirEnd: number, deload: boolean): { week: number; sessions: PlanSession[] }[] {
+export function expand(base: PlanSession[], weeks: number, rirStart: number, rirEnd: number, deload: boolean, types: RirType[] = []): { week: number; sessions: PlanSession[] }[] {
   return Array.from({ length: weeks }, (_, w) => {
     const last = deload && weeks > 1 && w === weeks - 1;
     const build = deload && weeks > 2 ? weeks - 1 : weeks;
     const rir = last ? Math.max(rirStart, 3) + 1 : Math.round(rirStart + ((rirEnd - rirStart) * w) / Math.max(1, build - 1));
-    return { week: w + 1, sessions: base.map((s) => ({ name: s.name.trim() || "Session", items: relabel(s.items.filter((it) => it.exercise.trim()).map((it) => ({ ...it, exercise: it.exercise.trim(), sets: last ? Math.max(1, Math.ceil(it.sets / 2)) : it.sets, rir }))) })) };
+    return { week: w + 1, sessions: base.map((s) => ({ name: s.name.trim() || "Session", items: relabel(s.items.filter((it) => it.exercise.trim()).map((it) => ({ ...it, exercise: it.exercise.trim(), sets: last ? Math.max(1, Math.ceil(it.sets / 2)) : it.sets, rir: typed(it, w + 1, weeks, deload, types) ?? rir }))) })) };
   });
 }
 
@@ -18,9 +21,9 @@ const REST = "Rest";
 
 /** Like expand, but the weekday layout drives the week: a session placed on several days becomes "Name 1", "Name 2" with the same
  *  exercises, and an optional second layout is used on even weeks (a two week rotation such as A/B days one after another). */
-export function expandLayouts(base: PlanSession[], weeks: number, rirStart: number, rirEnd: number, deload: boolean, a: Row[], b: Row[] | null):
+export function expandLayouts(base: PlanSession[], weeks: number, rirStart: number, rirEnd: number, deload: boolean, a: Row[], b: Row[] | null, types: RirType[] = []):
   { weeks: { week: number; sessions: PlanSession[]; split?: Row[] }[]; split: Row[] } {
-  const flat = expand(base, weeks, rirStart, rirEnd, deload);
+  const flat = expand(base, weeks, rirStart, rirEnd, deload, types);
   const rotating = !!b;
   const build = (layout: Row[], w: (typeof flat)[number]) => {
     const rows = layout.filter((r) => r.session !== REST && w.sessions.some((s) => s.name === r.session.trim()));

@@ -28,11 +28,11 @@ export function Admin({ onBack }: { onBack: () => void }) {
       copy(link(r.token)); setF({ email: "", note: "", days: f.days }); void load();
     } catch (e) { say((e as Error).message); }
   };
-  if (!d) return <div className="stack-lg"><div className="page-head"><div><h1>Admin</h1></div><button className="btn" onClick={onBack}>Back</button></div><p className="dim">Loading</p></div>;
+  if (!d) return <div className="stack-lg"><div className="page-head"><div><h1>Admin</h1></div><button className="btn" onClick={onBack}>Go back</button></div><p className="dim">Loading</p></div>;
   const users = d.users.filter((u) => `${u.name} ${u.email}`.toLowerCase().includes(q.toLowerCase()));
   return (
     <div className="stack-lg">
-      <div className="page-head"><div><h1>Admin</h1><p className="sub">Sign-ups, coach approvals and invite links.</p></div><button className="btn" onClick={onBack}>Back</button></div>
+      <div className="page-head"><div><h1>Admin</h1><p className="sub">Sign-ups, coach approvals and invite links.</p></div><button className="btn" onClick={onBack}>Go back</button></div>
 
       <div className="row" style={{ gap: 10, flexWrap: "nowrap" }}>
         {[["Users", d.stats.users], ["Coaches", d.stats.coaches], ["New, 7 days", d.stats.week]].map(([l, v]) => (

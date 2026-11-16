@@ -98,7 +98,7 @@ export function Welcome() {
             <input ref={file} type="file" accept="application/json" hidden onChange={async (e) => { const f = e.target.files?.[0]; if (!f) return; try { await st.importAll(await f.text()); } catch (err) { st.say((err as Error).message); } e.target.value = ""; }} />
           </div>
         ) : (
-          <div className="stack"><button className="btn ghost" style={{ justifySelf: "start" }} onClick={() => setPicking(false)}>Back</button><ProgramPicker onDone={() => setPicking(false)} /></div>
+          <div className="stack"><button className="btn ghost" style={{ justifySelf: "start" }} onClick={() => setPicking(false)}>Go back</button><ProgramPicker onDone={() => setPicking(false)} /></div>
         )}
       </div>
       {samples && <SamplePicker onClose={() => setSamples(false)} />}

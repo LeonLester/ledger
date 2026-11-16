@@ -3,8 +3,11 @@ export type Mode = "sheet" | "feedback" | "auto";
 
 export type LiftKey = "squat" | "bench" | "deadlift" | "ohp";
 export interface SetScheme { pct: number; reps: number; amrap?: boolean }
+export interface RirType { id: string; name: string; /** reps in reserve in the first week of a block */ start: number; /** reps in reserve in the last build week */ end: number }
 export interface PlanItem {
   letter: string; exercise: string; sets: number; repLo: number | null; repHi: number | null; rir: number | null;
+  /** which RIR type this exercise follows on this day; its RIR then moves from the type's first week to its last */
+  rirType?: string;
   /** powerlifting: lift whose training max the percentages refer to */
   lift?: LiftKey; pct?: number; scheme?: SetScheme[]; desc?: string;
 }
@@ -15,11 +18,11 @@ export interface Meso { id: string; name: string; weeks: PlanWeek[]; deload?: bo
 export interface SetLog { weight: number | null; reps: number | null; myo: number[]; rir?: number | null; done?: boolean; tr?: number | null; amrap?: boolean }
 export interface RepMetric { rom: number; mcv: number; pv: number; dev: number; tUp: number }
 export interface BarPathRec { set: number; at: number; fps: number; pts: [number, number][]; reps: RepMetric[] }
-export interface ExLog { letter: string; exercise: string; unit: Unit | null; rir: number | null; sets: SetLog[]; note: string | null; tech?: number | null; form?: string[]; paths?: BarPathRec[] }
+export interface ExLog { letter: string; exercise: string; unit: Unit | null; rir: number | null; sets: SetLog[]; note: string | null; /** share of bodyweight added to the logged load (1 for a pull-up) */ bwf?: number; /** kg already on the implement before any plates (sled, machine carriage) */ base?: number; /** bodyweight in kg when the exercise was added */ bw?: number | null; tech?: number | null; form?: string[]; paths?: BarPathRec[] }
 export interface Muscle3 { pump: number; workload: number }
 export interface Session {
   id: string; athleteId: string; meso: string; week: number; name: string;
-  date: string | null; status: "done" | "active"; exercises: ExLog[]; started?: number; finished?: number;
+  date: string | null; status: "done" | "active"; exercises: ExLog[]; started?: number; finished?: number; /** note for the whole session */ note?: string;
 }
 export interface Feedback {
   id: string; athleteId: string; sessionId: string; meso: string; week: number; muscle: string;
@@ -28,11 +31,18 @@ export interface Feedback {
 }
 export interface Adjustment { id: string; athleteId: string; meso: string; week: number; muscle: string; delta: number; source: "feedback" | "manual" }
 export interface BodyWeight { id: string; athleteId: string; date: string; kg: number; src?: "mealcost" }
-export interface ExerciseDef { name: string; muscle: string; unit: Unit; increment: number; guessed?: boolean }
+export interface ExerciseDef {
+  name: string; /** primary muscle: the one that limits the set */ muscle: string; unit: Unit; increment: number; guessed?: boolean;
+  /** secondary muscles and the share of a set each one earns (0 to 1) */ contrib?: Record<string, number>;
+  /** share of bodyweight that counts as load (pull-up 1, dip 0.9) */ bwf?: number;
+  /** kg on the implement with no plates, for example a leg press sled */ base?: number;
+  /** note shown every time this exercise is logged */ note?: string;
+  /** RIR type a new plan row starts with */ rirType?: string;
+}
 
 export interface Settings {
   athleteId: string; mode: Mode; unit: Unit; bar: number; plates: number[]; restSec: number;
-  theme: "auto" | "dark" | "light"; mesoStart: string | null; activeMeso: string; week: number;
+  theme: "auto" | "dark" | "light"; rirTypes?: RirType[]; mesoStart: string | null; activeMeso: string; week: number;
   fx?: import("./lib/formulas").Formulas; onboarded?: boolean; effort?: "rir" | "rpe"; sex?: "m" | "f"; tms?: Partial<Record<LiftKey, number>>; liftMap?: Partial<Record<LiftKey, string>>;
 }
 export interface Seed {

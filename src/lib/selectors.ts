@@ -29,14 +29,16 @@ export function parseReps(t: string): { reps: number | null; myo: number[] } | n
   const [a, ...r] = v.split("+").map(Number);
   return { reps: a, myo: r };
 }
-export function setsPerMuscle(sessions: Session[], meso: string, week: number, muscleOf: (e: string) => string) {
+/** hard sets per muscle for a week. A contributor earns its share of each set, so a bench set also counts a third toward triceps. */
+export function setsPerMuscle(sessions: Session[], meso: string, week: number, weightsOf: (e: string) => [string, number][]) {
   const out: Record<string, number> = {};
   for (const s of sessions) {
     if (s.meso !== meso || s.week !== week) continue;
-    for (const e of s.exercises) { const n = workedSets(e).length; if (n) out[muscleOf(e.exercise)] = (out[muscleOf(e.exercise)] ?? 0) + n; }
+    for (const e of s.exercises) { const n = workedSets(e).length; if (n) for (const [m, f] of weightsOf(e.exercise)) out[m] = (out[m] ?? 0) + n * f; }
   }
   return out;
 }
+export const fmtSets = (n: number) => { const r = Math.round(n * 2) / 2; return Number.isInteger(r) ? String(r) : r.toFixed(1); };
 export function sessionDate(s: Session, mesoStart: string | null, split: { day: string; session: string }[]): string | null {
   if (s.date) return s.date;
   if (!mesoStart) return null;

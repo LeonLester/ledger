@@ -1,5 +1,5 @@
 import type { BodyWeight, ExLog, Session } from "../types";
-import { fmtW, worked } from "./math";
+import { fmtW, kgLoad, worked } from "./math";
 import { effReps, est1rm, weightForReps } from "./formulas";
 import { orderKey, sessionDate } from "./selectors";
 
@@ -21,7 +21,8 @@ function rowsOf(e: ExLog, bw: number | null, onlyDone: boolean): { r: Row; i: nu
   const out: { r: Row; i: number }[] = [];
   e.sets.forEach((s, i) => {
     if (!worked(s) || s.weight == null || (onlyDone && !s.done)) return;
-    const w = kgOf(e, s.weight);
+    const w = kgLoad(e, s)!;
+    if (w <= 0) return;
     out.push({ i, r: { w, ow: s.weight, reps: s.reps!, e1: e.unit === "pin" || s.reps! > 12 ? null : est1rm(w, effReps(s)), bw } });
   });
   return out;

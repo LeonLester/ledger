@@ -24,3 +24,22 @@ export function coarse(m: string): string {
   if (/Neck/.test(m)) return "Neck";
   return m;
 }
+
+/** Secondary muscles that usually fail close behind the primary one, with the share of a set each earns. A starting point the user edits. */
+const CONTRIB: [RegExp, Record<string, number>][] = [
+  [/overhead (tricep|extension)|skull|pushdown|kickback/i, {}],
+  [/close.?grip bench|dip|push-?up/i, { Chest: 0.5, "Shoulders (Front)": 0.33 }],
+  [/bench|chest press|incline.*press|decline|\bbp\b|pec/i, { "Triceps (long head)": 0.33, "Shoulders (Front)": 0.33 }],
+  [/overhead press|\bohp\b|shoulder press|military/i, { "Triceps (long head)": 0.33 }],
+  [/pull-?up|chin|pulldown|lat pull/i, { Biceps: 0.33 }],
+  [/row/i, { Biceps: 0.33, "Shoulders (lateral)": 0.25 }],
+  [/romanian|stiff|good ?morning|\brdl\b|\bsldl\b/i, { Glutes: 0.5, Erectors: 0.5 }],
+  [/deadlift|\bdl\b/i, { Hamstrings: 0.5, Glutes: 0.5, "Mid Back": 0.25 }],
+  [/hip thrust|pull-?through/i, { Hamstrings: 0.25 }],
+  [/lunge|split squat|step.?up/i, { Glutes: 0.5 }],
+  [/squat|leg press|hack/i, { Glutes: 0.5 }],
+];
+export function suggestContrib(name: string, primary: string): Record<string, number> | undefined {
+  for (const [re, c] of CONTRIB) if (re.test(name)) { const out = Object.fromEntries(Object.entries(c).filter(([m]) => m !== primary)); return Object.keys(out).length ? out : undefined; }
+  return undefined;
+}

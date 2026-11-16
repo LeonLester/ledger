@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Download, Upload } from "lucide-react";
+import { Download, Plus, Trash2, Upload } from "lucide-react";
+import { DEFAULT_RIR_TYPES } from "../lib/rir";
+import { getLang, setLang } from "../i18n";
 import { useStore } from "../store";
 import { sessionDate, sortSessions } from "../lib/selectors";
 import { Seg } from "./common";
@@ -15,6 +17,34 @@ function save(name: string, text: string, type = "text/plain") {
   const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
 const csv = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+
+function RirTypes() {
+  const { settings, setSettings } = useStore();
+  const rpe = settings.effort === "rpe";
+  const types = settings.rirTypes ?? DEFAULT_RIR_TYPES;
+  const put = (t: typeof types) => setSettings({ rirTypes: t });
+  const upd = (i: number, p: Partial<(typeof types)[number]>) => put(types.map((t, k) => (k === i ? { ...t, ...p } : t)));
+  const n = (v: string, d: number) => { const x = parseInt(v, 10); return Number.isFinite(x) ? Math.max(0, Math.min(10, x)) : d; };
+  return (
+    <section className="panel stack" style={{ padding: 16 }} aria-label="RIR types">
+      <div><h3>RIR types</h3><p className="dim small">Give each kind of exercise its own effort target across a block. In Plan you choose a type per exercise and per training day, and its {rpe ? "RPE" : "RIR"} moves from the first week to the last build week. A deload week sits above the start.</p></div>
+      <div className="stack" style={{ gap: 8 }}>
+        <div className="row xs faint" style={{ flexWrap: "nowrap", gap: 6 }}><span style={{ flex: 1 }}>Name</span><span style={{ width: 64, textAlign: "center" }}>First week</span><span style={{ width: 64, textAlign: "center" }}>Last week</span><span style={{ width: 36 }} /></div>
+        {types.map((t, i) => (
+          <div key={t.id} className="row" style={{ flexWrap: "nowrap", gap: 6 }}>
+            <input className="input" aria-label={`Name of type ${i + 1}`} value={t.name} onChange={(e) => upd(i, { name: e.target.value })} />
+            <input className="input num" style={{ width: 64, flex: "none", textAlign: "center" }} inputMode="numeric" aria-label={`${t.name} first week ${rpe ? "RPE" : "RIR"}`} value={rpe ? 10 - t.start : t.start} onChange={(e) => upd(i, { start: rpe ? 10 - n(e.target.value, 10 - t.start) : n(e.target.value, t.start) })} />
+            <input className="input num" style={{ width: 64, flex: "none", textAlign: "center" }} inputMode="numeric" aria-label={`${t.name} last week ${rpe ? "RPE" : "RIR"}`} value={rpe ? 10 - t.end : t.end} onChange={(e) => upd(i, { end: rpe ? 10 - n(e.target.value, 10 - t.end) : n(e.target.value, t.end) })} />
+            <button className="btn ghost icon sm" aria-label={`Remove ${t.name}`} onClick={() => put(types.filter((_, k) => k !== i))}><Trash2 size={16} /></button>
+          </div>
+        ))}
+      </div>
+      <div className="row wrap"><button className="btn sm" onClick={() => put([...types, { id: `t${Date.now().toString(36)}`, name: `Type ${types.length + 1}`, start: 4, end: 1 }])}><Plus size={16} /> Add type</button>
+        <button className="btn ghost sm" onClick={() => put(DEFAULT_RIR_TYPES)}>Reset to defaults</button></div>
+      <p className="faint xs">Existing plans keep their numbers. A type applies when you build a program or edit sessions and pick it for an exercise.</p>
+    </section>
+  );
+}
 
 function CoachRequest() {
   const say = useStore((s) => s.say);
@@ -145,9 +175,11 @@ export function More() {
           <label className="field" style={{ flex: 2 }}><span>Plates per side (kg)</span><input className="input num" defaultValue={settings.plates.join(", ")} onBlur={(e) => setSettings({ plates: e.target.value.split(/[ ,]+/).map(Number).filter((n) => n > 0) })} /></label></div>
         <div className="field"><span>Effort scale</span><Seg full value={settings.effort ?? "rir"} onChange={(effort) => setSettings({ effort })} options={[{ v: "rir", label: "RIR" }, { v: "rpe", label: "RPE" }]} label="Effort scale" /></div>
         <div className="field"><span>Theme</span><Seg full value={settings.theme} onChange={(theme) => { setSettings({ theme }); }} options={[{ v: "auto", label: "System" }, { v: "dark", label: "Dark" }, { v: "light", label: "Light" }]} /></div>
+        <div className="field"><span>Language</span><Seg full value={getLang()} onChange={(l) => l !== getLang() && setLang(l)} options={[{ v: "en", label: "English" }, { v: "el", label: "Ελληνικά" }]} label="Language" /></div>
       </section>
 
 
+      <RirTypes />
       <FormulaSettings />
       <MealcostLink />
 

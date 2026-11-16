@@ -10,13 +10,20 @@ export const defaultIncrement = (u: Unit) => (u === "lb" ? 5 : u === "pin" ? 0.5
 export const worked = (s: SetLog) => s.reps != null && s.reps > 0;
 export const workedSets = (e: ExLog) => e.sets.filter(worked);
 
+/** total load of a set in kg: the logged weight (negative for assistance) plus bodyweight share plus the implement's own weight */
+export function kgLoad(e: ExLog, s: SetLog): number | null {
+  if (s.weight == null) return null;
+  const w = e.unit === "lb" ? s.weight * 0.45359 : s.weight;
+  return w + (e.base ?? 0) + (e.bwf ?? 0) * (e.bw ?? 0);
+}
+
 /** estimated 1RM in kg for a logged exercise; pin loads have no absolute weight */
 export function bestE1rm(e: ExLog): number | null {
   if (e.unit === "pin") return null;
   let best: number | null = null;
   for (const s of e.sets) {
-    if (s.weight == null || !worked(s)) continue;
-    const w = e.unit === "lb" ? s.weight * 0.45359 : s.weight;
+    const w = kgLoad(e, s);
+    if (w == null || w <= 0 || !worked(s)) continue;
     const v = est1rm(w, effReps(s));
     if (best == null || v > best) best = v;
   }
@@ -26,7 +33,7 @@ export function topSet(e: ExLog): SetLog | null {
   let top: SetLog | null = null;
   for (const s of e.sets) {
     if (s.weight == null || !worked(s)) continue;
-    if (!top || s.weight > top.weight! || (s.weight === top.weight && s.reps! > top.reps!)) top = s;
+    if (!top || kgLoad(e, s)! > kgLoad(e, top)! || (kgLoad(e, s) === kgLoad(e, top) && s.reps! > top.reps!)) top = s;
   }
   return top;
 }
