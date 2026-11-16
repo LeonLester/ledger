@@ -27,7 +27,7 @@ export function Volume() {
       <section className="panel" style={{ padding: "4px 16px" }} aria-label="Weekly volume by muscle">
         {muscles.map((m) => {
           const d = done[m] ?? 0, p = planned[m] ?? 0;
-          const t = weekTarget(m, week, targets) ?? p;
+          const t = meso.volTargets?.[m]?.[week - 1] ?? weekTarget(m, week, targets) ?? p;
           const mrv = mrvFor(m, landmarks);
           const max = Math.max(t, p, d, mrv ?? 0, 1) * 1.08;
           const plate = d === 0 ? "var(--faint)" : mrv != null && d > mrv ? "var(--red)" : d >= t ? "var(--grn)" : d >= t * 0.6 ? "var(--yel)" : "var(--chalk)";
@@ -47,7 +47,7 @@ export function Volume() {
       <p className="faint xs">White tick: sets in this week's plan. Red line: MRV for the muscle group. Bar turns green once the target is reached.</p>
       <section className="stack"><h2>Across the block</h2>
         <div className="heat panel" style={{ padding: 8 }}><table><thead><tr><th>Muscle</th>{weeks.map((w) => <th key={w}>W{w}</th>)}</tr></thead><tbody>
-          {muscles.map((m) => <tr key={m}><td>{m}</td>{weeks.map((w) => { const v = heat(m, w), t = weekTarget(m, w, targets); const r = t ? v / t : 0;
+          {muscles.map((m) => <tr key={m}><td>{m}</td>{weeks.map((w) => { const v = heat(m, w), t = meso.volTargets?.[m]?.[w - 1] ?? weekTarget(m, w, targets); const r = t ? v / t : 0;
             return <td key={w} className="c" style={{ background: v ? `color-mix(in srgb, var(--accent) ${Math.min(55, r * 40)}%, transparent)` : undefined }}>{v ? fmtSets(v) : ""}</td>; })}</tr>)}
         </tbody></table></div></section>
       <p className="faint xs">{Object.keys(library).length} exercises mapped to muscles. Fix a wrong mapping under More, Exercise library.</p>

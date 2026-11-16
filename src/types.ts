@@ -8,12 +8,14 @@ export interface PlanItem {
   letter: string; exercise: string; sets: number; repLo: number | null; repHi: number | null; rir: number | null;
   /** which RIR type this exercise follows on this day; its RIR then moves from the type's first week to its last */
   rirType?: string;
+  /** sets in the last build week; sets then ramp from `sets` in week 1 to this */
+  setsEnd?: number;
   /** powerlifting: lift whose training max the percentages refer to */
   lift?: LiftKey; pct?: number; scheme?: SetScheme[]; desc?: string;
 }
 export interface PlanSession { name: string; items: PlanItem[] }
 export interface PlanWeek { week: number; sessions: PlanSession[]; /** set when the weekday layout differs from week to week */ split?: { day: string; session: string; emphasis: string }[] }
-export interface Meso { id: string; name: string; weeks: PlanWeek[]; deload?: boolean; /** no fixed weekdays: sessions run in order, whenever the lifter can train */ flexible?: boolean }
+export interface Meso { id: string; name: string; weeks: PlanWeek[]; deload?: boolean; /** no fixed weekdays: sessions run in order, whenever the lifter can train */ flexible?: boolean; /** weekly hard-set targets per muscle, one value per week (null = none) */ volTargets?: Record<string, (number | null)[]> }
 
 export interface SetLog { weight: number | null; reps: number | null; myo: number[]; rir?: number | null; done?: boolean; tr?: number | null; amrap?: boolean }
 export interface RepMetric { rom: number; mcv: number; pv: number; dev: number; tUp: number }

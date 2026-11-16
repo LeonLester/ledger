@@ -6,6 +6,7 @@ import { effectiveSessions, pumpLabels } from "../lib/progression";
 import { Seg } from "./common";
 import { MesoEditor, SplitEditor, evenSplit } from "./Builder";
 import { LogSheet } from "./LogSheet";
+import { SetsPlanner } from "./SetsPlanner";
 import { muscleColor } from "../lib/groups";
 import type { CSSProperties } from "react";
 import { CoachInbox } from "./CoachInbox";
@@ -13,7 +14,7 @@ import type { SplitRow } from "../data/templates";
 
 export function Plan() {
   const { mesos, settings, adjustments, muscleOf, setSettings, feedback, split: globalSplit, saveSplit, saveMeso, say } = useStore();
-  const [view, setView] = useState<"plan" | "sheet">("plan");
+  const [view, setView] = useState<"plan" | "sheet" | "sets">("plan");
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<SplitRow[] | null>(null);
   const [mesoId, setMesoId] = useState(settings.activeMeso);
@@ -33,7 +34,7 @@ export function Plan() {
     <div className="stack-lg">
       <div className="page-head"><div><h1>Plan</h1><p className="sub">Your mesocycles, with feedback changes layered on top.</p></div><div className="row"><button className="btn" onClick={() => setEditing(true)}>Edit sessions</button><button className="btn" onClick={() => setPicking(true)}>New program</button></div></div>
       <CoachInbox />
-      <Seg full value={view} onChange={setView} options={[{ v: "plan", label: "Plan" }, { v: "sheet", label: "Log sheet" }]} label="View" />
+      <Seg full value={view} onChange={setView} options={[{ v: "plan", label: "Plan" }, { v: "sets", label: "Sets" }, { v: "sheet", label: "Log sheet" }]} label="View" />
       <div className="row wrap">
         <Seg value={mesoId} onChange={(v) => { setMesoId(v); setWeek(1); }} options={mesos.map((m) => ({ v: m.id, label: mesoLabel(m.name) }))} label="Mesocycle" />
         <Seg value={week} onChange={setWeek} options={meso.weeks.map((w) => ({ v: w.week, label: `W${w.week}` }))} label="Week" />
@@ -41,6 +42,7 @@ export function Plan() {
       {mesoId !== settings.activeMeso && <div className="row"><span className="dim small">This is an earlier block.</span><button className="btn sm" onClick={() => setSettings({ activeMeso: mesoId, week })}>Make it active</button></div>}
 
       {view === "sheet" && <LogSheet mesoId={mesoId} />}
+      {view === "sets" && <SetsPlanner meso={meso} />}
       {view === "plan" && eff.map((s) => {
         const sets = s.items.reduce((a, i) => a + i.sets, 0);
         const baseSets = base?.sessions.find((x) => x.name === s.name)?.items.reduce((a, i) => a + i.sets, 0) ?? sets;

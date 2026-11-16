@@ -10,6 +10,7 @@ import { lastLog, parseReps, repsText, sortSessions } from "../lib/selectors";
 import { SessionComments } from "./CoachInbox";
 import type { ExLog, SetLog } from "../types";
 import { Seg, Sheet } from "./common";
+import { ExerciseEditor, useAllMuscles } from "./Library";
 
 function RepsCell({ s, placeholder, onChange }: { s: SetLog; placeholder: string; onChange: (v: { reps: number | null; myo: number[] }) => void }) {
   const [t, setT] = useState(repsText(s));
@@ -44,6 +45,9 @@ export function SessionView({ id }: { id: string }) {
   const [adding, setAdding] = useState(false);
   const [linkNew, setLinkNew] = useState(false);
   const [sessionNote, setSessionNote] = useState(false);
+  const [q, setQ] = useState("");
+  const [creating, setCreating] = useState<{ kind: "add" | "swap"; i: number; name: string } | null>(null);
+  const allMuscles = useAllMuscles();
   const meso = mesos.find((m) => m.id === sess?.meso);
   const plan = useMemo(() => (meso && sess ? effectiveSessions(meso, sess.week, adjustments, muscleOf).find((p) => p.name === sess.name) : undefined), [meso, sess?.week, sess?.name, adjustments]);
   const prs = useMemo(() => (sess ? sessionPrs(sess, sessions, bodyweight, { mesoStart: settings.mesoStart, split }, sess.status === "active") : []), [sess, sessions, bodyweight]);
@@ -56,6 +60,11 @@ export function SessionView({ id }: { id: string }) {
   const readOnly = sess.status === "done";
   const grp = runs(sess.exercises);
 
+  const swapTo = (i: number, name: string) => {
+    const d = useStore.getState().library[name]; const lg = lastLog(name, sessions, sess);
+    updateEx(id, i, (x) => ({ ...x, bwf: undefined, base: undefined, bw: undefined, ...st.extrasOf(name), exercise: name, unit: d?.unit ?? x.unit, sets: x.sets.map((s) => ({ ...s, weight: lg ? lg.sets[0]?.weight ?? null : null, reps: null, myo: [], done: false })) }));
+    setMenu(null); setQ("");
+  };
   const patchSet = (i: number, j: number, p: Partial<SetLog>) => updateEx(id, i, (e) => ({ ...e, sets: e.sets.map((s, k) => (k === j ? { ...s, ...p } : s)) }));
 
   return (
@@ -181,11 +190,15 @@ export function SessionView({ id }: { id: string }) {
             )}
             {menu?.i === i && menu.kind === "tech" && <TechSheet id={id} i={i} onClose={() => setMenu(null)} />}
             {menu?.i === i && menu.kind === "swap" && (
-              <Sheet title={`Swap ${ex.exercise}`} onClose={() => setMenu(null)}>
-                <p className="dim small">Same muscle ({muscleOf(ex.exercise)}). Loads reset to the new lift's history.</p>
-                <div className="list">{Object.values(library).filter((d) => d.muscle === muscleOf(ex.exercise) && d.name !== ex.exercise).map((d) => {
+              <Sheet title={`Swap ${ex.exercise}`} onClose={() => { setMenu(null); setQ(""); }}>
+                <p className="dim small">{q ? "All exercises" : `Same muscle (${muscleOf(ex.exercise)})`}. Loads reset to the new lift's history.</p>
+                <div className="sheet-sticky stack" style={{ gap: 8 }}>
+                  <input className="input" placeholder="Find an exercise" aria-label="Find an exercise" value={q} onChange={(e) => setQ(e.target.value)} />
+                  <button className="btn" style={{ justifySelf: "start" }} onClick={() => { setCreating({ kind: "swap", i, name: q.trim() }); setMenu(null); }}><Plus size={16} /> {q.trim() ? `Create "${q.trim()}"` : "Create a new exercise"}</button>
+                </div>
+                <div className="list">{Object.values(library).filter((d) => d.name !== ex.exercise && (q ? d.name.toLowerCase().includes(q.toLowerCase()) : d.muscle === muscleOf(ex.exercise))).sort((a, b) => a.name.localeCompare(b.name)).map((d) => {
                   const lg = lastLog(d.name, sessions, sess);
-                  return <button key={d.name} className="sess-row" onClick={() => { updateEx(id, i, (x) => ({ ...x, bwf: undefined, base: undefined, bw: undefined, ...st.extrasOf(d.name), exercise: d.name, unit: d.unit, sets: x.sets.map((s) => ({ ...s, weight: lg ? lg.sets[0]?.weight ?? null : null, reps: null, myo: [], done: false })) })); setMenu(null); }}>
+                  return <button key={d.name} className="sess-row" onClick={() => swapTo(i, d.name)}>
                     <div><div className="ex-name" style={{ fontSize: "1.2rem" }}>{d.name}</div><div className="dim small">{lg ? `Last ${fmtW(lg.sets[0]?.weight)}x${lg.sets[0]?.reps}` : "No history"}</div></div></button>;
                 })}</div>
               </Sheet>
@@ -200,14 +213,20 @@ export function SessionView({ id }: { id: string }) {
       </div>
 
       {adding && (
-        <Sheet title="Add exercise" onClose={() => setAdding(false)}>
+        <Sheet title="Add exercise" onClose={() => { setAdding(false); setQ(""); }}>
           {sess.exercises.length > 0 && <label className="row" style={{ gap: 10, marginBottom: 8 }}><input type="checkbox" checked={linkNew} onChange={(e) => setLinkNew(e.target.checked)} /><span className="small">Superset with {sess.exercises[sess.exercises.length - 1].exercise}</span></label>}
-          <div className="list">{Object.values(library).sort((a, b) => a.name.localeCompare(b.name)).map((d) => (
-            <button key={d.name} className="sess-row" onClick={() => { st.addExercise(id, d.name, linkNew); setAdding(false); setLinkNew(false); }}>
+          <div className="sheet-sticky stack" style={{ gap: 8 }}>
+            <input className="input" placeholder="Find an exercise" aria-label="Find an exercise" value={q} onChange={(e) => setQ(e.target.value)} />
+            <button className="btn" style={{ justifySelf: "start" }} onClick={() => { setCreating({ kind: "add", i: -1, name: q.trim() }); setAdding(false); }}><Plus size={16} /> {q.trim() ? `Create "${q.trim()}"` : "Create a new exercise"}</button>
+          </div>
+          <div className="list">{Object.values(library).filter((d) => !q || d.name.toLowerCase().includes(q.toLowerCase())).sort((a, b) => a.name.localeCompare(b.name)).map((d) => (
+            <button key={d.name} className="sess-row" onClick={() => { st.addExercise(id, d.name, linkNew); setAdding(false); setLinkNew(false); setQ(""); }}>
               <div><div className="ex-name" style={{ fontSize: "1.2rem" }}>{d.name}</div><div className="dim small">{d.muscle}</div></div></button>
           ))}</div>
         </Sheet>
       )}
+      {creating && <ExerciseEditor name={null} initialName={creating.name} muscles={allMuscles} onClose={() => { setCreating(null); setQ(""); }}
+        onSaved={(n) => { if (creating.kind === "add") { st.addExercise(id, n, linkNew); setLinkNew(false); } else swapTo(creating.i, n); }} />}
       {finishing && <FinishSheet id={id} onClose={() => setFinishing(false)} />}
     </div>
   );

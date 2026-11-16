@@ -245,3 +245,13 @@ textarea.input { height: auto; line-height: 1.4; }
 .note-line:hover { border-color: var(--line-strong); }
 .session-note { margin: 0 0 14px; }
 .rir-fixed { display: flex; align-items: center; justify-content: center; font-size: .86rem; color: var(--dim); background: var(--s2); }
+
+/* set planner grids */
+table.sets-grid { table-layout: auto; min-width: 0; width: 100%; }
+table.sets-grid th.lib-n, table.sets-grid td.lib-n { width: 120px; min-width: 110px; }
+table.sets-grid th { text-align: center; } table.sets-grid th.lib-n { text-align: left; }
+.sg-cell { text-align: center; padding: 4px !important; white-space: nowrap; vertical-align: middle !important; }
+.sg-cell .input { display: block; margin: 2px auto 0; }
+
+/* a search field and its create button stay at the top of a sheet while the list scrolls under them */
+.sheet-sticky { position: sticky; top: -18px; z-index: 2; background: var(--s1); padding: 22px 0 10px; margin-top: -8px; border-bottom: 1px solid var(--line); }

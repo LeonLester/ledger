@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { IntBox } from "./common";
+import { ExerciseEditor, useAllMuscles } from "./Library";
 import { ArrowDown, ArrowUp, Link2, Plus, Trash2, Unlink2 } from "lucide-react";
 import { linkPrev, muscleColor, prefix, runs } from "../lib/groups";
 import { DEFAULT_RIR_TYPES, rirForType } from "../lib/rir";
@@ -13,18 +14,21 @@ const blank = (): PlanItem => ({ letter: "~", exercise: "", sets: 3, repLo: 8, r
 const num = (v: string, d: number | null) => { const n = parseInt(v, 10); return Number.isFinite(n) ? n : d; };
 
 /** Edit a list of sessions: names, exercises, sets, rep range and RIR. Used by the program builder and by the plan editor. */
-export function SessionsEditor({ sessions, onChange }: { sessions: PlanSession[]; onChange: (s: PlanSession[]) => void }) {
+export function SessionsEditor({ sessions, onChange, ramp = true }: { sessions: PlanSession[]; onChange: (s: PlanSession[]) => void; ramp?: boolean }) {
   const names = useStore((s) => Object.keys(s.library).sort());
   const effort = useStore((s) => s.settings.effort ?? "rir");
   const muscleOf = useStore((s) => s.muscleOf);
   const types = useStore((s) => s.settings.rirTypes) ?? DEFAULT_RIR_TYPES;
   const library = useStore((s) => s.library);
+  const allMuscles = useAllMuscles();
+  const [creating, setCreating] = useState<{ i: number; j: number; name: string } | null>(null);
   const setSess = (i: number, fn: (s: PlanSession) => PlanSession) => onChange(sessions.map((s, k) => (k === i ? fn(s) : s)));
   const setItem = (i: number, j: number, patch: Partial<PlanItem>) => setSess(i, (s) => ({ ...s, items: s.items.map((it, k) => (k === j ? { ...it, ...patch } : it)) }));
   const move = (i: number, j: number, d: number) => setSess(i, (s) => { const a = [...s.items]; const t = j + d; if (t < 0 || t >= a.length) return s; [a[j], a[t]] = [a[t], a[j]]; return { ...s, items: relabel(a) }; });
   return (
     <div className="stack-lg">
       <datalist id="ex-names">{names.map((n) => <option key={n} value={n} />)}</datalist>
+      {creating && <ExerciseEditor name={null} initialName={creating.name} muscles={allMuscles} onClose={() => setCreating(null)} onSaved={(n) => setItem(creating.i, creating.j, { exercise: n })} />}
       {sessions.map((s, i) => (
         <section key={i} className="panel stack" style={{ padding: 14 }}>
           <div className="row between" style={{ gap: 8 }}>
@@ -41,9 +45,11 @@ export function SessionsEditor({ sessions, onChange }: { sessions: PlanSession[]
                   <span className="letter" style={{ background: `color-mix(in srgb, ${muscleColor(muscleOf(it.exercise))} 55%, var(--s1))`, color: "#0b0d10", borderColor: muscleColor(muscleOf(it.exercise)) }}>{it.letter === "~" ? "A1" : it.letter}</span>
                   {j > 0 && <button className="btn ghost sm" aria-pressed={linked} aria-label={linked ? "Remove from superset" : "Superset with the exercise above"} onClick={() => setSess(i, (x) => ({ ...x, items: linkPrev(x.items, j, !linked) }))}>{linked ? <Unlink2 size={16} color="var(--accent)" /> : <Link2 size={16} />}{linked ? "Unlink" : "Superset"}</button>}
                 </div>
-                <input className="input" list="ex-names" placeholder="Exercise" aria-label="Exercise" value={it.exercise} onChange={(e) => { const d = library[e.target.value]; setItem(i, j, { exercise: e.target.value, ...(d?.rirType && !it.rirType && types.some((t) => t.id === d.rirType) ? { rirType: d.rirType } : {}) }); }} />
+                <div className="row" style={{ gap: 6, flexWrap: "nowrap" }}><input className="input" list="ex-names" placeholder="Exercise" aria-label="Exercise" value={it.exercise} onChange={(e) => { const d = library[e.target.value]; setItem(i, j, { exercise: e.target.value, ...(d?.rirType && !it.rirType && types.some((t) => t.id === d.rirType) ? { rirType: d.rirType } : {}) }); }} />
+                  <button className="btn sm" style={{ flex: "none" }} aria-label="Create a new exercise" onClick={() => setCreating({ i, j, name: it.exercise && !library[it.exercise] ? it.exercise : "" })}><Plus size={16} /></button></div>
                 <div className="row" style={{ gap: 8, alignItems: "end", flexWrap: "wrap" }}>
                   <label className="field" style={{ width: 58 }}><span className="xs">Sets</span><IntBox label="Sets" min={1} max={30} value={it.sets} onCommit={(n) => setItem(i, j, { sets: n ?? it.sets })} /></label>
+                  {ramp && <label className="field" style={{ width: 66 }}><span className="xs">Last wk</span><IntBox label="Sets in the last week" empty min={1} max={30} value={it.setsEnd ?? null} onCommit={(n) => setItem(i, j, { setsEnd: n ?? undefined })} /></label>}
                   <label className="field" style={{ width: 58 }}><span className="xs">Reps</span><IntBox label="Reps from" empty min={0} max={200} value={it.repLo} onCommit={(n) => setItem(i, j, { repLo: n })} /></label>
                   <label className="field" style={{ width: 58 }}><span className="xs">To</span><IntBox label="Reps to" empty min={0} max={200} value={it.repHi} onCommit={(n) => setItem(i, j, { repHi: n })} /></label>
                   {it.rirType && types.find((t) => t.id === it.rirType)
@@ -195,7 +201,7 @@ export function MesoEditor({ meso, week, onClose }: { meso: Meso; week: number; 
         <div className="seg full" role="group" aria-label="Scope">
           {([["week", `Week ${week} only`], ["from", `Week ${week} onward`], ["all", "All weeks"]] as const).map(([v, l]) => <button key={v} aria-pressed={scope === v} onClick={() => setScope(v)}>{l}</button>)}
         </div></div>
-      <SessionsEditor sessions={sessions} onChange={setSessions} />
+      <SessionsEditor sessions={sessions} onChange={setSessions} ramp={false} />
       <div className="row"><button className="btn primary" onClick={apply}>Save changes</button><button className="btn ghost" onClick={onClose}>Cancel</button></div>
     </div>
   );

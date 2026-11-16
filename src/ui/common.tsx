@@ -11,14 +11,22 @@ export function Seg<T extends string | number>({ value, options, onChange, full,
 
 export function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
+  // follow the visible area, so an open keyboard shrinks the sheet instead of covering it
+  const [vv, setVv] = useState<{ h: number; top: number } | null>(null);
+  useEffect(() => {
+    const v = window.visualViewport; if (!v) return;
+    const f = () => setVv({ h: v.height, top: v.offsetTop });
+    f(); v.addEventListener("resize", f); v.addEventListener("scroll", f);
+    return () => { v.removeEventListener("resize", f); v.removeEventListener("scroll", f); };
+  }, []);
   useEffect(() => {
     const k = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", k); ref.current?.focus();
     return () => window.removeEventListener("keydown", k);
   }, [onClose]);
   return (
-    <div className="scrim" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="sheet stack" role="dialog" aria-modal="true" aria-label={title} tabIndex={-1} ref={ref}>
+    <div className="scrim" style={vv ? { top: vv.top, height: vv.h, bottom: "auto" } : undefined} onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="sheet stack" style={vv ? { maxHeight: vv.h * 0.92 } : undefined} role="dialog" aria-modal="true" aria-label={title} tabIndex={-1} ref={ref}>
         <div className="row between"><h2>{title}</h2><button className="btn ghost icon sm" onClick={onClose} aria-label="Close"><X size={20} /></button></div>
         {children}
       </div>
@@ -56,11 +64,11 @@ export function IntBox({ value, min, max, empty, label, onCommit, className = "i
     onBlur={() => { if (t === "") { if (!empty) setT(String(value ?? min)); return; } const c = Math.max(min, Math.min(max, parseInt(t, 10))); setT(String(c)); onCommit(c); }} />;
 }
 
-/** Decimal box with the same typing behaviour: "17." and "17.5" can be typed, and leaving an empty box restores the old value. */
-export function DecBox({ value, min, max, label, onCommit, className = "input num" }: { value: number; min: number; max: number; label: string; onCommit: (n: number) => void; className?: string }) {
-  const [t, setT] = useState(String(value));
-  useEffect(() => { if (Number(t.replace(",", ".")) !== value) setT(String(value)); /* eslint-disable-next-line */ }, [value]);
-  return <input className={className} inputMode="decimal" aria-label={label} value={t}
-    onChange={(e) => { const v = e.target.value; if (!/^\d*[.,]?\d*$/.test(v)) return; setT(v); const n = Number(v.replace(",", ".")); if (v !== "" && Number.isFinite(n) && n >= min && n <= max) onCommit(n); }}
-    onBlur={() => { const n = Number(t.replace(",", ".")); if (t === "" || !Number.isFinite(n)) { setT(String(value)); return; } const c = Math.max(min, Math.min(max, n)); setT(String(c)); onCommit(c); }} />;
+/** Decimal box with the same typing behaviour: "17." and "17.5" can be typed. Empty is allowed when `empty` is set, otherwise leaving it empty restores the old value. */
+export function DecBox({ value, min, max, empty, label, onCommit, className = "input num", style }: { value: number | null; min: number; max: number; empty?: boolean; label: string; onCommit: (n: number | null) => void; className?: string; style?: React.CSSProperties }) {
+  const [t, setT] = useState(value == null ? "" : String(value));
+  useEffect(() => { if ((t === "" ? null : Number(t.replace(",", "."))) !== value) setT(value == null ? "" : String(value)); /* eslint-disable-next-line */ }, [value]);
+  return <input className={className} style={style} inputMode="decimal" aria-label={label} value={t}
+    onChange={(e) => { const v = e.target.value; if (!/^\d*[.,]?\d*$/.test(v)) return; setT(v); if (v === "") { if (empty) onCommit(null); return; } const n = Number(v.replace(",", ".")); if (Number.isFinite(n) && n >= min && n <= max) onCommit(n); }}
+    onBlur={() => { if (t === "" || !Number.isFinite(Number(t.replace(",", ".")))) { if (!empty) setT(String(value ?? min)); return; } const c = Math.max(min, Math.min(max, Number(t.replace(",", ".")))); setT(String(c)); onCommit(c); }} />;
 }

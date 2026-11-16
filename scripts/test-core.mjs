@@ -11,6 +11,7 @@ import { rirForType, DEFAULT_RIR_TYPES } from "../src/lib/rir.ts";
 import { kgLoad, bestE1rm } from "../src/lib/math.ts";
 import { setsPerMuscle } from "../src/lib/selectors.ts";
 import { suggestContrib } from "../src/lib/muscles.ts";
+import { volumeOf, setsForWeek, rampTargets, suggestSets, diffSets } from "../src/lib/volplan.ts";
 import { expand, expandLayouts } from "../src/lib/expand.ts";
 import { setFormulas, est1rm, weightForReps, checkFormula, compile, score, parseWarm } from "../src/lib/formulas.ts";
 
@@ -173,6 +174,24 @@ for (const t of TEMPLATES) {
   const vol = setsPerMuscle([{ id: "s", meso: "m1", week: 1, exercises: [{ exercise: "Bench", sets: [{ reps: 8 }, { reps: 8 }, { reps: 8 }] }] }], "m1", 1, wt);
   ok(vol.Chest === 3 && Math.abs(vol.Triceps - 0.99) < 1e-9, "contributor muscles earn a share of each set");
   ok(suggestContrib("Barbell Bench Press", "Chest")?.["Triceps (long head)"] === 0.33 && suggestContrib("Lat Pulldown", "Mid Back")?.Biceps === 0.33, "contributor suggestions");
+}
+{
+  const W = (ex) => ({ Bench: [["Chest", 1], ["Triceps", 0.33]], Fly: [["Chest", 1]], Pushdown: [["Triceps", 1]], Squat: [["Quads", 1], ["Glutes", 0.5]] })[ex] ?? [[ex, 1]];
+  const mk = (ex, sets, extra = {}) => ({ letter: "A1", exercise: ex, sets, repLo: 8, repHi: 12, rir: 2, ...extra });
+  const sess = [{ name: "Push", items: [mk("Bench", 3), mk("Fly", 3), mk("Pushdown", 3)] }, { name: "Legs", items: [mk("Squat", 4, { pct: 0.8 })] }];
+  const v0 = volumeOf(sess, W);
+  ok(Math.abs(v0.Chest - 6) < 1e-9 && Math.abs(v0.Triceps - (3 + 0.99)) < 1e-9 && v0.Glutes === 2, "volume counts contributors by fraction");
+  ok([1, 2, 3, 4, 5].map((w) => setsForWeek({ sets: 3, setsEnd: 6 }, w, 5, true)).join() === "3,4,5,6,3", "sets ramp to the last build week, half in the deload");
+  ok(rampTargets(10, 16, 5, true).join() === "10,12,14,16,8", "weekly muscle targets ramp: " + rampTargets(10, 16, 5, true));
+  const out = suggestSets(sess, { Chest: 12, Triceps: 6 }, W);
+  const v1 = volumeOf(out, W);
+  ok(Math.abs(v1.Chest - 12) <= 0.5 && Math.abs(v1.Triceps - 6) <= 0.7, `solver lands near the targets: chest ${v1.Chest.toFixed(2)} triceps ${v1.Triceps.toFixed(2)}`);
+  ok(out[1].items[0].sets === 4 && out.flatMap((s) => s.items).every((i) => i.sets >= 1 && i.sets <= 12), "solver leaves percentage lifts alone and keeps sets in range");
+  ok(diffSets(sess, out).length > 0 && diffSets(sess, sess).length === 0, "diff lists the changes");
+  const dec = suggestSets(sess, { Chest: 3 }, W);
+  ok(volumeOf(dec, W).Chest < 6 && volumeOf(dec, W).Chest >= 2, "solver can also lower volume");
+  const e = expand([{ name: "A", items: [mk("Fly", 3, { setsEnd: 6 })] }], 5, 3, 1, true);
+  ok(e.map((w) => w.sessions[0].items[0].sets).join() === "3,4,5,6,3", "expand applies the per-exercise set ramp");
 }
 console.log(fails ? `\n${fails} failed` : "\nall passed");
 process.exit(fails ? 1 : 0);

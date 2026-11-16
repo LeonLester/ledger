@@ -1,6 +1,7 @@
 import type { PlanSession, RirType } from "../types";
 import { relabel } from "./groups";
 import { rirForType } from "./rir";
+import { setsForWeek } from "./volplan";
 export { relabel };
 
 const typed = (it: { rirType?: string }, week: number, weeks: number, deload: boolean, types: RirType[]) => { const t = it.rirType ? types.find((x) => x.id === it.rirType) : undefined; return t ? rirForType(t, week, weeks, deload) : undefined; };
@@ -11,7 +12,7 @@ export function expand(base: PlanSession[], weeks: number, rirStart: number, rir
     const last = deload && weeks > 1 && w === weeks - 1;
     const build = deload && weeks > 2 ? weeks - 1 : weeks;
     const rir = last ? Math.max(rirStart, 3) + 1 : Math.round(rirStart + ((rirEnd - rirStart) * w) / Math.max(1, build - 1));
-    return { week: w + 1, sessions: base.map((s) => ({ name: s.name.trim() || "Session", items: relabel(s.items.filter((it) => it.exercise.trim()).map((it) => ({ ...it, exercise: it.exercise.trim(), sets: last ? Math.max(1, Math.ceil(it.sets / 2)) : it.sets, rir: typed(it, w + 1, weeks, deload, types) ?? rir }))) })) };
+    return { week: w + 1, sessions: base.map((s) => ({ name: s.name.trim() || "Session", items: relabel(s.items.filter((it) => it.exercise.trim()).map((it) => ({ ...it, exercise: it.exercise.trim(), sets: it.setsEnd != null ? setsForWeek(it, w + 1, weeks, deload) : last ? Math.max(1, Math.ceil(it.sets / 2)) : it.sets, rir: typed(it, w + 1, weeks, deload, types) ?? rir }))) })) };
   });
 }
 

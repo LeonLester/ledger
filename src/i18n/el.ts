@@ -164,6 +164,12 @@ export const EL: Record<string, string> = {
   "Train the sessions in order on any day.": "Κάνε τις προπονήσεις με τη σειρά, όποια μέρα θέλεις.", "Train the sessions in order on any day. Nothing is placed on the calendar for you.": "Κάνε τις προπονήσεις με τη σειρά, όποια μέρα θέλεις. Τίποτα δεν μπαίνει αυτόματα στο ημερολόγιο.",
   "No fixed weekdays: train the sessions in order, whenever you can. The next one is marked.": "Χωρίς σταθερές μέρες: κάνε τις προπονήσεις με τη σειρά, όποτε μπορείς. Η επόμενη είναι σημειωμένη.", "Next up": "Επόμενη", Schedule: "Πρόγραμμα", "Use fixed weekdays": "Χρήση σταθερών ημερών", "No fixed weekdays": "Χωρίς σταθερές μέρες",
   "No fixed weekdays. Train the sessions in order, on any day, and the next one is marked in Train. Nothing is placed on the calendar for you.": "Χωρίς σταθερές μέρες. Κάνε τις προπονήσεις με τη σειρά, όποια μέρα θέλεις, και η επόμενη σημειώνεται στην Προπόνηση. Τίποτα δεν μπαίνει αυτόματα στο ημερολόγιο.", "Weekdays are on": "Οι σταθερές μέρες ενεργοποιήθηκαν", "Weekdays are off": "Οι σταθερές μέρες απενεργοποιήθηκαν",
+  "Weekly sets per muscle": "Εβδομαδιαία σετ ανά μυ", "Sets by exercise and week": "Σετ ανά άσκηση και εβδομάδα", "Suggest sets to match": "Πρόταση σετ για να ταιριάξει", "Clear targets": "Καθαρισμός στόχων", Ramp: "Κλιμάκωση", "Suggested sets": "Προτεινόμενα σετ", "Apply to the plan": "Εφαρμογή στο πλάνο",
+  "The big number is what your plan gives now, counting a secondary muscle by its share of each set. Type the sets you want underneath, or use Ramp to move a muscle in a straight line from week 1 to the last build week.": "Ο μεγάλος αριθμός είναι ό,τι δίνει τώρα το πλάνο σου, μετρώντας τον δευτερεύοντα μυ κατά το μερίδιό του σε κάθε σετ. Γράψε από κάτω τα σετ που θέλεις ή χρησιμοποίησε την Κλιμάκωση για να κινηθεί ο μυς σε ευθεία από την εβδομάδα 1 μέχρι την τελευταία εβδομάδα χτισίματος.",
+  "Suggested sets change whole sets per exercise, keep every exercise at 1 to 12 sets and leave percentage-based lifts alone. Targets also show in the Volume tab.": "Τα προτεινόμενα σετ αλλάζουν ακέραια σετ ανά άσκηση, κρατούν κάθε άσκηση ανάμεσα σε 1 και 12 σετ και αφήνουν ήσυχες τις ασκήσεις με ποσοστά. Οι στόχοι φαίνονται και στην καρτέλα Όγκος.",
+  "Change the sets of any exercise in any week by hand. Feedback adjustments stay layered on top.": "Άλλαξε με το χέρι τα σετ οποιασδήποτε άσκησης σε οποιαδήποτε εβδομάδα. Οι προσαρμογές από την ανατροφοδότηση μένουν από πάνω.", "These changes bring each week's muscle volume closest to your targets.": "Αυτές οι αλλαγές φέρνουν τον όγκο κάθε εβδομάδας όσο πιο κοντά στους στόχους σου.",
+  "The plan already matches your targets": "Το πλάνο ταιριάζει ήδη με τους στόχους σου", "Set a target for at least one muscle first": "Βάλε πρώτα στόχο για τουλάχιστον έναν μυ", "Targets cleared": "Οι στόχοι καθαρίστηκαν", "Last wk": "Τελ. εβδ.", "Sets in the last week": "Σετ στην τελευταία εβδομάδα",
+  "Create a new exercise": "Δημιουργία νέας άσκησης", "All exercises": "Όλες οι ασκήσεις", "Create new exercise": "Δημιουργία νέας άσκησης",
   and: "και", of: "από", sets: "σετ", set: "σετ", exercises: "ασκήσεις", exercise: "άσκηση", week: "εβδομάδα", target: "στόχος", planned: "προγραμματισμένα", deload: "εκφόρτιση", bodyweight: "σωματικό βάρος", base: "βάση", plan: "πλάνο", Planned: "Προγραμματισμένα",
 };
 
@@ -177,6 +183,9 @@ export const EL_PATTERNS: [RegExp, (t: Tr, ...m: string[]) => string][] = [
   [/^(\d+) exercises?(,?)$/, (t, a, c) => `${a} ασκήσεις${c}`],
   [/^(\d+) sets?(,?)$/, (t, a, c) => `${a} σετ${c}`],
   [/^Week (\d+) is done\. Go to week (\d+)$/, (t, a, b) => `Η εβδομάδα ${a} ολοκληρώθηκε. Πήγαινε στην εβδομάδα ${b}`],
+  [/^Create "(.+)"$/, (t, a) => `Δημιουργία "${a}"`],
+  [/^Sets updated in (\d+) weeks?$/, (t, a) => `Τα σετ ενημερώθηκαν σε ${a} εβδομάδ${a === "1" ? "α" : "ες"}`],
+  [/^Same muscle \((.+)\)\. Loads reset to the new lift's history\.$/, (t, a) => `Ίδιος μυς (${a}). Τα φορτία ξεκινούν από το ιστορικό της νέας άσκησης.`],
   [/^Week (\d+)$/, (t, a) => `Εβδομάδα ${a}`],
   [/^W(\d+)$/, (t, a) => `Ε${a}`],
   [/^Block (\d+)$/, (t, a) => `Μπλοκ ${a}`],

@@ -70,11 +70,11 @@ export function Library() {
   );
 }
 
-function ExerciseEditor({ name, muscles, onClose }: { name: string | null; muscles: string[]; onClose: () => void }) {
+export function ExerciseEditor({ name, muscles, onClose, initialName, onSaved }: { name: string | null; muscles: string[]; onClose: () => void; initialName?: string; onSaved?: (name: string) => void }) {
   const { library, setExercise, removeExercise, renameExercise, say } = useStore();
   const def = name ? library[name] : undefined;
   const [f, setF] = useState({
-    name: def?.name ?? "", muscle: def?.muscle ?? "", unit: (def?.unit ?? "kg") as Unit, step: String(def?.increment ?? 2.5),
+    name: def?.name ?? initialName ?? "", muscle: def?.muscle ?? "", unit: (def?.unit ?? "kg") as Unit, step: String(def?.increment ?? 2.5),
     bwf: def?.bwf ?? 0, base: def?.base ? String(def.base) : "", note: def?.note ?? "", rirType: def?.rirType ?? "",
   });
   const types = useStore.getState().settings.rirTypes ?? DEFAULT_RIR_TYPES;
@@ -94,7 +94,7 @@ function ExerciseEditor({ name, muscles, onClose }: { name: string | null; muscl
       muscle: f.muscle.trim(), unit: f.unit, increment: num(f.step) || defaultIncrement(f.unit),
       contrib: Object.keys(contrib).length ? contrib : undefined, bwf: f.bwf || undefined, base: num(f.base) || undefined, note: f.note.trim() || undefined, rirType: f.rirType || undefined,
     });
-    say(name ? "Saved" : `${nm} added`); onClose();
+    say(name ? "Saved" : `${nm} added`); onSaved?.(key); onClose();
   };
   return (
     <Sheet title={name ? "Edit exercise" : "New exercise"} onClose={onClose}>
@@ -138,4 +138,10 @@ function ExerciseEditor({ name, muscles, onClose }: { name: string | null; muscl
       </div>
     </Sheet>
   );
+}
+
+/** every muscle name in the library, primary or contributing, for pickers */
+export function useAllMuscles() {
+  const library = useStore((s) => s.library);
+  return useMemo(() => [...new Set(Object.values(library).flatMap((d) => [d.muscle, ...Object.keys(d.contrib ?? {})]))].sort(), [library]);
 }
