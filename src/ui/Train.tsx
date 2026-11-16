@@ -2,7 +2,7 @@ import { ChevronLeft, ChevronRight, Check } from "lucide-react";
 import { useStore } from "../store";
 import { effectiveSessions, pumpLabels } from "../lib/progression";
 import { SessionView } from "./SessionView";
-import { Seg } from "./common";
+import { ModeMenu, Seg } from "./common";
 import { installUpdate } from "../native";
 import { CoachInbox } from "./CoachInbox";
 
@@ -29,7 +29,10 @@ export function Train() {
     <div className="stack-lg">
       <div className="page-head">
         <div><h1>{meso.name}</h1><p className="sub">Week {week} of {weeks.length}{meso.deload !== false && week === weeks[weeks.length - 1] ? ", deload" : ""}</p></div>
-        <Seg value={settings.mode} onChange={(mode) => setSettings({ mode })} options={[{ v: "sheet", label: "Sheet" }, { v: "feedback", label: "Feedback" }, { v: "auto", label: "Auto" }]} label="Progression mode" />
+        <div className="row" style={{ gap: 4, flexWrap: "nowrap" }}>
+          <Seg value={settings.mode} onChange={(mode) => setSettings({ mode })} options={[{ v: "sheet", label: "Sheet" }, { v: "feedback", label: "Feedback" }, { v: "auto", label: "Auto" }]} label="Progression mode" />
+          <ModeMenu value={settings.mode} onChange={(mode) => setSettings({ mode })} />
+        </div>
       </div>
 
       <CoachInbox />

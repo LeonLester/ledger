@@ -4,7 +4,7 @@ import { DEFAULT_RIR_TYPES } from "../lib/rir";
 import { getLang, setLang } from "../i18n";
 import { useStore } from "../store";
 import { sessionDate, sortSessions } from "../lib/selectors";
-import { DecBox, IntBox, Seg } from "./common";
+import { DecBox, IntBox, ModeMenu, Seg } from "./common";
 import { Library } from "./Library";
 import { SamplePicker } from "./Samples";
 import { DEFAULT_WARM, E1RM_LABEL, E1RM_TEXT, SCORE_LABEL, checkFormula, est1rm, formulas, parseWarm, warmText, compile, type E1rmKey, type ScoreKey } from "../lib/formulas";
@@ -190,8 +190,7 @@ export function More() {
 
       <section className="panel stack" style={{ padding: 16 }}>
         <h3>Training</h3>
-        <div className="field"><span>Progression mode</span><Seg full value={settings.mode} onChange={(mode) => setSettings({ mode })} options={[{ v: "sheet", label: "Sheet only" }, { v: "feedback", label: "Sheet + feedback" }, { v: "auto", label: "Auto" }]} /></div>
-        <p className="dim small">Sheet only follows your periodization targets. Sheet + feedback asks for pump, workload and soreness, then proposes set changes you accept. Auto applies them for you, capped at MRV.</p>
+        <div className="field"><div className="row between"><span>Progression mode</span><ModeMenu value={settings.mode} onChange={(mode) => setSettings({ mode })} /></div><Seg full value={settings.mode} onChange={(mode) => setSettings({ mode })} options={[{ v: "sheet", label: "Sheet only" }, { v: "feedback", label: "Sheet + feedback" }, { v: "auto", label: "Auto" }]} /></div>
         <label className="field"><span>Mesocycle start date (needed to date the old sessions)</span><input type="date" className="input" value={settings.mesoStart ?? ""} onChange={(e) => setSettings({ mesoStart: e.target.value || null })} /></label>
         <label className="field"><span>Rest timer (seconds)</span><IntBox label="Rest timer (seconds)" min={15} max={3600} value={settings.restSec} onCommit={(n) => n != null && setSettings({ restSec: n })} /></label>
         <div className="row"><label className="field" style={{ flex: 1 }}><span>Bar (kg)</span><DecBox label="Bar (kg)" min={1} max={100} value={settings.bar} onCommit={(n) => n != null && setSettings({ bar: n })} /></label>

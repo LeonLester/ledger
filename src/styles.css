@@ -63,7 +63,8 @@ p { margin: 0; max-width: 62ch; }
 .nav button[aria-current=page] { color: var(--text); box-shadow: inset 0 2px 0 var(--accent); }
 .nav button[aria-current=page] svg { color: var(--accent); }
 .brand { display: none; }
-.nav-extra, .nav-toggle { display: none; }
+.nav-extra, .nav .nav-toggle, .nav-head { display: none; }
+.avatar { width: 36px; height: 36px; border-radius: 50%; flex: none; display: grid; place-items: center; background: var(--s3); border: 1px solid var(--line-strong); font-weight: 700; font-size: .9rem; color: var(--text); object-fit: cover; overflow: hidden; }
 @media (min-width: 960px) {
   .app { grid-template-columns: 224px 1fr; grid-template-rows: 1fr; transition: grid-template-columns .18s cubic-bezier(.16, 1, .3, 1); }
   .app.collapsed { grid-template-columns: 68px 1fr; }
@@ -79,7 +80,6 @@ p { margin: 0; max-width: 62ch; }
   .nav-account .who { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; text-align: left; padding: 6px 8px; min-height: 52px; border-radius: var(--rc); }
   .nav-account .who:hover { background: var(--s1); }
   .nav .nav-account button.who { background: none; box-shadow: none; }
-  .avatar { width: 36px; height: 36px; border-radius: 50%; flex: none; display: grid; place-items: center; background: var(--s3); border: 1px solid var(--line-strong); font-weight: 700; font-size: .9rem; color: var(--text); object-fit: cover; overflow: hidden; }
   .who-text { min-width: 0; display: grid; line-height: 1.2; }
   .who-text b { font-size: .88rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .who-text span { font-size: .74rem; color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -276,3 +276,14 @@ table.sets-grid th { text-align: center; } table.sets-grid th.lib-n { text-align
 
 /* a search field and its create button stay at the top of a sheet while the list scrolls under them */
 .sheet-sticky { position: sticky; top: -18px; z-index: 2; background: var(--s1); padding: 22px 0 10px; margin-top: -8px; border-bottom: 1px solid var(--line); }
+
+/* three-dot dropdown that floats instead of taking space */
+.menu-wrap { position: relative; flex: none; }
+.menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 35; width: min(340px, calc(100vw - 32px)); background: var(--s1); border: 1px solid var(--line-strong); border-radius: var(--r); padding: 6px; display: grid; gap: 2px; box-shadow: 0 16px 40px -16px rgba(0,0,0,.7); }
+.menu-item { display: grid; grid-template-columns: 20px 1fr; gap: 6px; align-items: start; text-align: left; padding: 10px 8px; border-radius: var(--rc); }
+.menu-item:hover { background: var(--s2); }
+.menu-item[aria-checked=true] { background: var(--s2); }
+.menu-check { color: var(--accent); padding-top: 2px; }
+.menu-text { display: block; color: var(--dim); font-size: .82rem; line-height: 1.35; margin-top: 2px; }
+.menu-foot { padding: 6px 8px 4px; border-top: 1px solid var(--line); margin-top: 4px; }
+.menu.up { top: auto; bottom: calc(100% + 6px); }

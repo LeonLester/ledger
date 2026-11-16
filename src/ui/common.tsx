@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { X } from "lucide-react";
+import { Check, MoreVertical, X } from "lucide-react";
 
 export function Seg<T extends string | number>({ value, options, onChange, full, accent, label }: { value: T; options: { v: T; label: string }[]; onChange: (v: T) => void; full?: boolean; accent?: boolean; label?: string }) {
   return (
@@ -71,4 +71,42 @@ export function DecBox({ value, min, max, empty, label, onCommit, className = "i
   return <input className={className} style={style} inputMode="decimal" aria-label={label} value={t}
     onChange={(e) => { const v = e.target.value; if (!/^\d*[.,]?\d*$/.test(v)) return; setT(v); if (v === "") { if (empty) onCommit(null); return; } const n = Number(v.replace(",", ".")); if (Number.isFinite(n) && n >= min && n <= max) onCommit(n); }}
     onBlur={() => { if (t === "" || !Number.isFinite(Number(t.replace(",", ".")))) { if (!empty) setT(String(value ?? min)); return; } const c = Math.max(min, Math.min(max, Number(t.replace(",", ".")))); setT(String(c)); onCommit(c); }} />;
+}
+
+const MODES = [
+  { v: "sheet", name: "Sheet only", text: "Follows your plan exactly. No ratings and no set changes." },
+  { v: "feedback", name: "Sheet + feedback", text: "After a session you rate pump and workload, then soreness next time. The app suggests set changes and you approve each one." },
+  { v: "auto", name: "Auto", text: "The same ratings, but the changes are applied for you, capped at each muscle's volume ceiling (MRV)." },
+] as const;
+
+/** A three-dot menu that explains the progression modes and lets you pick one. It floats over the page, so it takes no vertical space. */
+export function ModeMenu({ value, onChange }: { value: string; onChange: (v: "sheet" | "feedback" | "auto") => void }) {
+  const [open, setOpen] = useState(false);
+  const [up, setUp] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const r = ref.current?.getBoundingClientRect();
+    if (r) setUp(window.innerHeight - r.bottom < 340 && r.top > 340);
+    const down = (e: PointerEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
+    const key = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("pointerdown", down); document.addEventListener("keydown", key);
+    return () => { document.removeEventListener("pointerdown", down); document.removeEventListener("keydown", key); };
+  }, [open]);
+  return (
+    <div className="menu-wrap" ref={ref}>
+      <button className="btn ghost icon sm" aria-label="About the progression modes" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}><MoreVertical size={18} /></button>
+      {open && (
+        <div className={`menu ${up ? "up" : ""}`} role="menu" aria-label="Progression modes">
+          {MODES.map((m) => (
+            <button key={m.v} role="menuitemradio" aria-checked={value === m.v} className="menu-item" onClick={() => { onChange(m.v); setOpen(false); }}>
+              <span className="menu-check">{value === m.v ? <Check size={16} /> : null}</span>
+              <span><b>{m.name}</b><span className="menu-text">{m.text}</span></span>
+            </button>
+          ))}
+          <p className="faint xs menu-foot">Modes change sets only, never the weights you are asked to lift.</p>
+        </div>
+      )}
+    </div>
+  );
 }
