@@ -45,7 +45,7 @@ export interface LeverSpec {
 export interface MechSpec { dxVer: number; dx: number; /** the two numbers are distances travelled or lever arm lengths; the ratio is the same */ kind?: "dist" | "arm" }
 export type ProgKind = "double" | "dynamic" | "triple" | "linear" | "step" | "amrap" | "pct";
 /** how the next session's load is chosen for one exercise */
-export interface ProgSpec { kind: ProgKind; /** step: sessions to stay on a load */ hold?: number; /** step: kg added per step */ step?: number; /** triple: most sets before the load goes up */ maxSets?: number; /** pct: percent of the reference 1RM, and that 1RM in kg (blank = best estimate from the log) */ pct?: number; ref?: number }
+export interface ProgSpec { kind: ProgKind; /** step: sessions to stay on a load */ hold?: number; /** step: kg added per step */ step?: number; /** triple: most sets before the load goes up */ maxSets?: number; /** amrap: percent added to the next load for every rep above the planned reps on the last set */ pctPerRep?: number; /** pct: percent of the reference 1RM, and that 1RM in kg (blank = best estimate from the log) */ pct?: number; ref?: number }
 export interface ExerciseDef {
   name: string; /** primary muscle: the one that limits the set */ muscle: string; unit: Unit; increment: number; guessed?: boolean;
   /** secondary muscles and the share of a set each one earns (0 to 1) */ contrib?: Record<string, number>;

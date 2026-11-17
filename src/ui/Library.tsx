@@ -80,7 +80,7 @@ export function ExerciseEditor({ name, muscles, onClose, initialName, onSaved, o
     name: def?.name ?? initialName ?? "", muscle: def?.muscle ?? "", unit: (def?.unit ?? "kg") as Unit, step: String(def?.increment ?? 2.5),
     bwf: def?.bwf ?? 0, base: def?.base ? String(def.base) : "", note: def?.note ?? "", rirType: def?.rirType ?? "",
   });
-  const [pg, setPg] = useState<{ kind: ProgKind; hold: number; step: number | null; maxSets: number | null; pct: number; ref: number | null }>({ kind: def?.prog?.kind ?? "double", hold: def?.prog?.hold ?? 3, step: def?.prog?.step ?? null, maxSets: def?.prog?.maxSets ?? null, pct: def?.prog?.pct ?? 75, ref: def?.prog?.ref ?? null });
+  const [pg, setPg] = useState<{ kind: ProgKind; hold: number; step: number | null; maxSets: number | null; pct: number; ref: number | null; per: number }>({ kind: def?.prog?.kind ?? "double", hold: def?.prog?.hold ?? 3, step: def?.prog?.step ?? null, maxSets: def?.prog?.maxSets ?? null, pct: def?.prog?.pct ?? 75, ref: def?.prog?.ref ?? null, per: def?.prog?.pctPerRep ?? 1 });
   const [mode, setMode] = useState<"none" | "dist" | "arm">(def?.ma ? def.ma.kind ?? "dist" : def?.lever ? "arm" : "none");
   const [ma, setMa] = useState({ dxVer: def?.ma?.dxVer ?? def?.lever?.loadArm ?? 0, dx: def?.ma?.dx ?? def?.lever?.userArm ?? 0 });
   const bwNow = useStore.getState().extrasOf(name ?? "").bw ?? (useStore.getState().bodyweight.length ? [...useStore.getState().bodyweight].sort((x, y) => x.date.localeCompare(y.date)).slice(-1)[0].kg : 0);
@@ -104,7 +104,7 @@ export function ExerciseEditor({ name, muscles, onClose, initialName, onSaved, o
       contrib: Object.keys(contrib).length ? contrib : undefined, bwf: f.bwf || undefined, base: num(f.base) || undefined, note: f.note.trim() || undefined, rirType: f.rirType || undefined,
       ma: mode !== "none" && distFit(ma) ? { dxVer: ma.dxVer, dx: ma.dx, kind: mode } : undefined,
       lever: undefined,
-      prog: pg.kind === "double" ? undefined : { kind: pg.kind, ...(pg.kind === "step" ? { hold: pg.hold, step: pg.step ?? undefined } : {}), ...(pg.kind === "triple" && pg.maxSets ? { maxSets: pg.maxSets } : {}), ...(pg.kind === "pct" ? { pct: pg.pct, ref: pg.ref ?? undefined } : {}) },
+      prog: pg.kind === "double" ? undefined : { kind: pg.kind, ...(pg.kind === "step" ? { hold: pg.hold, step: pg.step ?? undefined } : {}), ...(pg.kind === "triple" && pg.maxSets ? { maxSets: pg.maxSets } : {}), ...(pg.kind === "amrap" ? { pctPerRep: pg.per } : {}), ...(pg.kind === "pct" ? { pct: pg.pct, ref: pg.ref ?? undefined } : {}) },
     });
     say(name ? "Saved" : `${nm} added`); onSaved?.(key); onClose();
   };
@@ -146,6 +146,7 @@ export function ExerciseEditor({ name, muscles, onClose, initialName, onSaved, o
               <label className="field" style={{ flex: "1 1 130px" }}><span>Step size ({f.unit})</span><DecBox value={pg.step} empty min={0.25} max={100} label="Load added per step" onCommit={(n) => setPg({ ...pg, step: n })} /></label>
             </div>
           )}
+          {pg.kind === "amrap" && <label className="field"><span>Percent added per extra rep</span><DecBox value={pg.per} min={0.1} max={10} label="Percent added per rep over the planned reps" onCommit={(n) => setPg({ ...pg, per: n ?? 1 })} /><span className="faint xs" style={{ fontWeight: 400 }}>Planned reps are the low end of the plan's rep range. The new load is rounded to the load step.</span></label>}
           {pg.kind === "triple" && <label className="field"><span>Most sets before adding load</span><DecBox value={pg.maxSets} empty min={1} max={12} label="Most sets" onCommit={(n) => setPg({ ...pg, maxSets: n == null ? null : Math.round(n) })} /><span className="faint xs" style={{ fontWeight: 400 }}>Blank: two more than the planned sets.</span></label>}
           {pg.kind === "pct" && (
             <div className="row wrap">

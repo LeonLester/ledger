@@ -15,7 +15,7 @@ export const PROG_INFO: Record<ProgKind, { label: string; text: string }> = {
   triple: { label: "Triple progression", text: "Add reps, then add sets up to a limit, then add load and go back to the base sets." },
   linear: { label: "Linear progression", text: "Add load every session in which all sets reach the target reps. Repeat the weight after a miss." },
   step: { label: "Step loading", text: "Stay on one load for several sessions, building reps, then step up by a larger jump." },
-  amrap: { label: "Last set AMRAP", text: "Fixed reps on every set but the last, which is taken to failure. Hitting the top of the range on it adds load." },
+  amrap: { label: "Last set AMRAP (Doug Young)", text: "Fixed reps on the first sets, the last set to failure. Every rep above the planned reps on that set adds a percentage to the next session's load, 1% by default." },
   pct: { label: "Fixed percentage", text: "Load is a set percentage of a reference 1RM, taken from the log or entered." },
 };
 
@@ -71,9 +71,9 @@ export function suggestTarget(item: PlanItem, last: ExLog | null, def: ExerciseD
   }
   if (p?.kind === "amrap") {
     const finalSet = done[done.length - 1];
-    const aHi = item.repHi ?? lo + 3;
-    if ((finalSet.reps ?? 0) >= aHi) return { weight: +(w + inc).toFixed(2), reps: lo, note: `AMRAP set reached ${finalSet.reps}. Add load.`, ...amrapNew };
-    return { weight: w, reps: lo, note: `AMRAP set reached ${finalSet.reps ?? 0}. Beat ${aHi - 1} to add load.`, ...amrapNew };
+    const per = p.pctPerRep ?? 1, extra = Math.max(0, (finalSet.reps ?? 0) - lo);
+    const next = extra > 0 ? (snap((finalSet.weight ?? w) * (1 + (per * extra) / 100), inc)) : (finalSet.weight ?? w);
+    return { weight: next, reps: lo, note: extra > 0 ? `AMRAP set: ${extra} over ${lo} reps, +${Math.round(per * extra * 10) / 10}%.` : `AMRAP set: ${finalSet.reps ?? 0} reps, no reps over ${lo}. Same load.`, ...amrapNew };
   }
 
   // double progression
