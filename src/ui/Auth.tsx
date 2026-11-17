@@ -5,8 +5,8 @@ import { getLang, setLang } from "../i18n";
 import { Seg } from "./common";
 import { APK_URL, isNative } from "../native";
 
-export function Auth() {
-  const [mode, setMode] = useState<"login" | "signup">("login");
+export function Auth({ initialMode = "login", onBack }: { initialMode?: "login" | "signup"; onBack?: () => void }) {
+  const [mode, setMode] = useState<"login" | "signup">(initialMode);
   const [f, setF] = useState({ name: "", email: "", password: "", code: "", coachKey: "" });
   const [coach, setCoach] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -32,7 +32,7 @@ export function Auth() {
   return (
     <div className="main" style={{ maxWidth: 440, margin: "0 auto", paddingTop: 48 }}>
       <form className="stack-lg" onSubmit={submit}>
-        <div className="row between"><span /><div className="seg" role="group" aria-label="Language">{(["en", "el"] as const).map((l) => <button key={l} type="button" aria-pressed={getLang() === l} onClick={() => getLang() !== l && setLang(l)}>{l === "en" ? "English" : "Ελληνικά"}</button>)}</div></div>
+        <div className="row between">{onBack ? <button type="button" className="btn ghost" onClick={onBack}>Back</button> : <span />}<div className="seg" role="group" aria-label="Language">{(["en", "el"] as const).map((l) => <button key={l} type="button" aria-pressed={getLang() === l} onClick={() => getLang() !== l && setLang(l)}>{l === "en" ? "English" : "Ελληνικά"}</button>)}</div></div>
         <div><h1>Ledger</h1><p className="sub">Your training log. Log in to keep your data on every device, or create an account.</p></div>
         {invite && <p className="small" role="status" style={{ margin: 0, padding: 12, border: "1px solid var(--accent)", borderRadius: 10, background: "var(--accent-soft)" }}>You have been invited to join Ledger as a coach. Create your account below{invite.email ? ` with ${invite.email}` : ""}.</p>}
         <Seg full value={mode} onChange={(m) => { setMode(m); setErr(""); }} options={[{ v: "login", label: "Log in" }, { v: "signup", label: "Sign up" }]} label="Account" />

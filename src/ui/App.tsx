@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { BarChart3, CalendarRange, Dumbbell, LogOut, Menu, Library as LibraryIcon, PanelLeftClose, PanelLeftOpen, Ruler, Settings2, Shield, TrendingUp, Users, X } from "lucide-react";
 import { useStore } from "../store";
 import { Train } from "./Train";
@@ -8,8 +8,9 @@ import { Progress } from "./Progress";
 import { More } from "./More";
 import { Exercises, Machines } from "./Tools";
 import { Welcome } from "./Programs";
-import { canUpdate, checkUpdate, ringNow, scheduleRest, syncSystemBars } from "../native";
+import { canUpdate, checkUpdate, isNative, ringNow, scheduleRest, syncSystemBars } from "../native";
 import { Auth } from "./Auth";
+import { Landing } from "./Landing";
 import { Component, type ReactNode } from "react";
 import { Coach } from "./Coach";
 import { logout, resume, setAfterPull, useSync, watchGoogleReturn } from "../sync";
@@ -91,6 +92,12 @@ class Boundary extends Component<{ children: ReactNode; reset: unknown }, { err:
 export function App() {
   const { ready, settings, toast, openSession, mesos } = useStore();
   const [tab, setTab] = useState<TabId | "admin">("train");
+  /** signed-out visitors see the landing page first, unless they came from an invite or coach link, a login link, or the Android app */
+  const landingOk = useMemo(() => {
+    if (isNative) return false;
+    try { return !/invite=|coach=|#login|#signup/.test(location.hash) && !sessionStorage.getItem("ledger.invite") && !sessionStorage.getItem("ledger.coach"); } catch { return true; }
+  }, []);
+  const [entry, setEntry] = useState<"login" | "signup" | null>(() => (landingOk ? null : /#signup|invite=|coach=/.test(location.hash) ? "signup" : "login"));
   useEffect(() => { const h = (e: Event) => setTab((e as CustomEvent<"admin">).detail); window.addEventListener("ledger:tab", h); return () => window.removeEventListener("ledger:tab", h); }, []);
   const { phase, user } = useSync();
   const avatar = useStore((s) => s.avatar);
@@ -113,7 +120,7 @@ export function App() {
     const mq = window.matchMedia("(prefers-color-scheme: dark)"); const on = () => syncSystemBars(settings.theme); mq.addEventListener("change", on);
     return () => mq.removeEventListener("change", on);
   }, [settings.theme]);
-  if (phase === "out") return <Auth />;
+  if (phase === "out") return entry ? <Auth initialMode={entry} onBack={landingOk ? () => setEntry(null) : undefined} /> : <Landing go={setEntry} />;
   if (phase === "booting" || !ready) return <div className="main"><h1>Ledger</h1><p className="sub">Loading your log</p></div>;
   const noProgram = !settings.onboarded || mesos.length === 0;
   if (noProgram && user?.role !== "coach") return <Welcome />;
