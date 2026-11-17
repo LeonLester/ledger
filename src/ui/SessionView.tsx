@@ -5,11 +5,11 @@ import { PR_LABEL, sessionPrs } from "../lib/pr";
 import { TechSheet } from "./Technique";
 import { LeverSheet } from "./Lever";
 import { summarize } from "../lib/lever";
-import { fitOf, r1, trueRes, weightFor } from "../lib/mech";
+import { extraLoad, r1, resFit, trueRes, weightFor } from "../lib/mech";
 import { useStore } from "../store";
 import { bestE1rm, defaultIncrement, fmtW, isMyo, PLATE_COLORS, plateLoad, warmups, workedSets } from "../lib/math";
 import { effectiveSessions, feedbackDelta, pumpLabels, sorenessLabels, suggestTarget, workloadLabels } from "../lib/progression";
-import { lastLog, parseReps, repsText, sortSessions } from "../lib/selectors";
+import { exHistory, lastLog, parseReps, repsText, sortSessions } from "../lib/selectors";
 import { SessionComments } from "./CoachInbox";
 import type { ExLog, SetLog } from "../types";
 import { IntBox, Seg, Sheet } from "./common";
@@ -66,9 +66,10 @@ export function SessionView({ id }: { id: string }) {
 
   const swapTo = (i: number, name: string) => {
     const lib = useStore.getState().library; const d = lib[name]; const lg = lastLog(name, sessions, sess);
-    const from = fitOf(lib[sess.exercises[i].exercise]), to = fitOf(d), inc = d?.increment ?? 2.5;
+    const oldEx = sess.exercises[i], xOld = extraLoad(oldEx), xNew = extraLoad({ ...st.extrasOf(name), unit: d?.unit ?? "kg" });
+    const from = resFit(lib[oldEx.exercise], xOld), to = resFit(d, xNew), inc = d?.increment ?? 2.5;
     // keep the same true resistance when either machine has its mechanical advantage set
-    const match = (w: number | null) => (w == null || (!from && !to) ? null : (() => { const r = from ? trueRes(from, w) : w; const n = to ? weightFor(to, r) : r; return n > 0 ? Math.round(n / inc) * inc : null; })());
+    const match = (w: number | null) => (w == null || (!from && !to) ? null : (() => { const r = from ? trueRes(from, w, xOld) : w; const n = to ? weightFor(to, r, xNew) : r; return Math.round(n / inc) * inc; })());
     const matched = (from || to) && sess.exercises[i].sets.some((s) => s.weight != null);
     updateEx(id, i, (x) => ({ ...x, bwf: undefined, base: undefined, bw: undefined, ...st.extrasOf(name), exercise: name, unit: d?.unit ?? x.unit, sets: x.sets.map((s) => ({ ...s, weight: matched ? match(s.weight) : lg ? lg.sets[0]?.weight ?? null : null, reps: null, myo: [], done: false })) }));
     if (matched) st.say("Weights matched to the same true resistance");
@@ -111,8 +112,8 @@ export function SessionView({ id }: { id: string }) {
         const item = plan?.items.find((p) => p.letter === ex.letter && p.exercise === ex.exercise) ?? plan?.items.find((p) => p.exercise === ex.exercise) ?? plan?.items[i];
         const last = lastLog(ex.exercise, sessions, sess);
         const def = library[ex.exercise];
-        const fit = fitOf(def);
-        const tgt = item ? suggestTarget(item, last, def) : null;
+        const xl = extraLoad(ex), fit = resFit(def, xl);
+        const tgt = item ? suggestTarget(item, last, def, exHistory(ex.exercise, sessions, sess)) : null;
         const inc = def?.increment ?? defaultIncrement(ex.unit ?? "kg");
         const unit = ex.unit ?? "kg";
         const prevSets = last ? last.sets : [];
@@ -147,7 +148,7 @@ export function SessionView({ id }: { id: string }) {
             {item?.desc && <div className="target"><span>Prescribed <b>{item.desc}</b></span></div>}
             {tgt && !item?.scheme && !(item?.pct != null && item.lift && settings.tms?.[item.lift]) && (
               <div className="target">
-                {tgt.weight != null ? <span>Aim <b className="num">{fmtW(tgt.weight)} {unit}</b>{fit ? <> (true <b className="num">{fmtW(r1(trueRes(fit, tgt.weight)))}</b>)</> : null} for <b>{item?.repLo}{item && item.repHi !== item.repLo ? `-${item.repHi}` : ""}</b> reps</span> : <span>Aim for <b>{item?.repLo}{item && item.repHi !== item.repLo ? `-${item.repHi}` : ""}</b> reps</span>}
+                {tgt.perSet ? <span>Aim <b className="num">{tgt.perSet.map((q) => `${fmtW(q.weight)}x${q.reps}`).join(", ")}</b></span> : tgt.weight != null ? <span>Aim <b className="num">{fmtW(tgt.weight)} {unit}</b>{fit ? <> (true <b className="num">{fmtW(r1(trueRes(fit, tgt.weight, xl)))}</b>)</> : null} for <b>{item?.repLo}{item && item.repHi !== item.repLo ? `-${item.repHi}` : ""}</b> reps</span> : <span>Aim for <b>{item?.repLo}{item && item.repHi !== item.repLo ? `-${item.repHi}` : ""}</b> reps{tgt.amrapLast ? ", last set to failure" : ""}</span>}
                 <span className="faint">{tgt.note}</span>
               </div>
             )}
@@ -162,8 +163,8 @@ export function SessionView({ id }: { id: string }) {
                     <button className={`n num myo-toggle ${isMyo(s) ? "on" : ""}`} aria-pressed={isMyo(s)} aria-label={`Set ${j + 1} myo-reps`} title="Tap to make this a myo-rep set" disabled={readOnly}
                       onClick={() => patchSet(i, j, isMyo(s) ? { myoOn: false, myo: [] } : { myoOn: true })}>{isMyo(s) ? "M" : j + 1}</button>
                     <span className="prev num">{p && p.reps != null ? `${fmtW(p.weight) || "-"}x${repsText(p)}` : "-"}</span>
-                    <WeightCell value={s.weight} text={!!ex.bwf} label={`Set ${j + 1} weight`} placeholder={fmtW(p?.weight ?? null) || "0"} onChange={(v) => patchSet(i, j, { weight: v })} />
-                    {fit && <WeightCell value={s.weight == null ? null : r1(trueRes(fit, s.weight))} text={false} label={`Set ${j + 1} true resistance`} placeholder="-" onChange={(v) => patchSet(i, j, { weight: v == null ? null : Math.round(weightFor(fit, v) * 10) / 10 })} />}
+                    <WeightCell value={s.weight} text={!!ex.bwf || !!ex.base || s.weight != null && s.weight < 0} label={`Set ${j + 1} weight`} placeholder={fmtW(p?.weight ?? null) || "0"} onChange={(v) => patchSet(i, j, { weight: v })} />
+                    {fit && <WeightCell value={s.weight == null ? null : r1(trueRes(fit, s.weight, xl))} text={false} label={`Set ${j + 1} true resistance`} placeholder="-" onChange={(v) => patchSet(i, j, { weight: v == null ? null : Math.round(weightFor(fit, v, xl) * 10) / 10 })} />}
                     <RepsCell s={s} placeholder={s.tr ? `${s.tr}${s.amrap ? "+" : ""}` : item?.repLo ? String(item.repLo) : "0"} onChange={(v) => patchSet(i, j, v)} />
                     <EffCell rir={s.rir} rpe={rpeMode} label={`Set ${j + 1} ${rpeMode ? "RPE" : "reps in reserve"}`} placeholder={ex.rir != null ? String(rpeMode ? 10 - ex.rir : ex.rir) : "-"} onChange={(v) => patchSet(i, j, { rir: v })} />
                     <button className={`disc ${rirClass}`} aria-pressed={!!s.done} aria-label={`Set ${j + 1} done`} onClick={() => toggleSet(id, i, j)}>

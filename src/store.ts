@@ -9,7 +9,7 @@ import type { Adjustment, BodyWeight, ExerciseDef, ExLog, Feedback, Meso, Seed, 
 import { defaultIncrement, isoDate, uid, worked } from "./lib/math";
 import { coarse, guessMuscle, suggestContrib } from "./lib/muscles";
 import { effectiveSessions, feedbackDelta, mrvFor, suggestTarget, weekTarget } from "./lib/progression";
-import { lastLog, mesoNum } from "./lib/selectors";
+import { exHistory, lastLog, mesoNum } from "./lib/selectors";
 import { CAT, LIFT_NAME } from "./data/catalog";
 import { sampleYear } from "./data/sampleYear";
 import { TEMPLATES } from "./data/templates";
@@ -248,9 +248,10 @@ export const useStore = create<State>((set, get) => ({
       if (it.scheme) {
         sets = it.scheme.map((sc) => ({ weight: wFor(sc.pct), reps: null, myo: [], tr: sc.reps, amrap: !!sc.amrap }));
       } else {
-        const tgt = suggestTarget(it, lastLog(it.exercise, sessions), def);
+        const tgt = suggestTarget(it, lastLog(it.exercise, sessions), def, exHistory(it.exercise, sessions));
         const w = it.pct != null && tm ? wFor(it.pct) : tgt.weight;
-        sets = Array.from({ length: Math.max(1, it.sets) }, () => ({ weight: w, reps: null, myo: [] }));
+        const n = Math.max(1, tgt.sets ?? it.sets);
+        sets = Array.from({ length: n }, (_, j) => ({ weight: tgt.perSet?.[j]?.weight ?? w, reps: null, myo: [], ...(tgt.amrapLast ? { tr: tgt.reps, amrap: j === n - 1 } : {}) }));
       }
       return { letter: it.letter, exercise: it.exercise, unit: def?.unit ?? "kg", rir: it.rir, note: null, sets, ...get().extrasOf(it.exercise) };
     });

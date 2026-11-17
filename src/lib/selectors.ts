@@ -18,6 +18,13 @@ export function lastLog(exercise: string, sessions: Session[], before?: Session)
   }
   return null;
 }
+/** every earlier worked log of an exercise, newest first */
+export function exHistory(exercise: string, sessions: Session[], before?: Session): ExLog[] {
+  const pool = sortSessions(sessions.filter((s) => s.status === "done" || s.id !== before?.id)).filter((s) => !before || orderKey(s) < orderKey(before));
+  const out: ExLog[] = [];
+  for (let i = pool.length - 1; i >= 0; i--) { const e = pool[i].exercises.find((x) => x.exercise === exercise && workedSets(x).length > 0); if (e) out.push(e); }
+  return out;
+}
 export function repsText(s: { reps: number | null; myo: number[] }) {
   if (s.reps == null) return "";
   return String(s.reps) + s.myo.filter((m) => m > 0).map((m) => "+" + m).join("");

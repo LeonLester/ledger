@@ -1,4 +1,4 @@
-import { fitOf, trueRes, weightFor } from "../src/lib/mech.ts";
+import { extraLoad, fitOf, resFit, trueRes, weightFor } from "../src/lib/mech.ts";
 let fails = 0;
 const ok = (c, m) => { if (!c) { fails++; console.log("FAIL", m); } else console.log("ok  ", m); };
 const near = (a, b, e = 0.05) => Math.abs(a - b) <= e;
@@ -10,4 +10,10 @@ const lev = fitOf({ lever: { loadArm: 200, userArm: 100, start: 0, end: 0.0001, 
 ok(near(lev.a, 2, 0.001) && near(lev.b, 0, 0.001), "lever with equal-ish angles: arm ratio 2");
 const lev2 = fitOf({ lever: { loadArm: 100, userArm: 100, start: 0, end: 0.0001, offset: 0, armMass: 10, armCom: 100, path: "arc", pull: 90 } });
 ok(near(trueRes(lev2, 50), 60, 0.01) && near(weightFor(lev2, 60), 50, 0.01), "arm mass adds a constant");
+ok(extraLoad({ base: 40, bwf: 0.25, bw: 80 }) === 60 && extraLoad({}) === 0, "tare weight and bodyweight share add up");
+const xl = extraLoad({ base: 40 });
+ok(near(trueRes(lp, 100, xl), 99.4, 0.01) && near(weightFor(lp, 99.4, xl), 100, 0.05), "leg press with a 40 kg sled: (100 + 40) x 0.71");
+const assist = resFit(undefined, extraLoad({ bwf: 1, bw: 80 }));
+ok(near(trueRes(assist, -30, 80), 50) && near(weightFor(assist, 50, 80), -30), "assisted pull-up: 80 kg bodyweight with -30 assistance is 50");
+ok(resFit(undefined, 0) === null, "no extras, no column");
 console.log(fails ? `${fails} failed` : "all passed"); process.exit(fails ? 1 : 0);

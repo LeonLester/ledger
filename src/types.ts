@@ -42,7 +42,10 @@ export interface LeverSpec {
   path: "arc" | "fixed"; /** fixed pull direction in degrees from level */ pull: number;
 }
 /** how far the load rises and how far the limb travels, any length unit: true resistance is the logged load times rise over travel */
-export interface MechSpec { dxVer: number; dx: number }
+export interface MechSpec { dxVer: number; dx: number; /** the two numbers are distances travelled or lever arm lengths; the ratio is the same */ kind?: "dist" | "arm" }
+export type ProgKind = "double" | "dynamic" | "triple" | "linear" | "step" | "amrap" | "pct";
+/** how the next session's load is chosen for one exercise */
+export interface ProgSpec { kind: ProgKind; /** step: sessions to stay on a load */ hold?: number; /** step: kg added per step */ step?: number; /** triple: most sets before the load goes up */ maxSets?: number; /** pct: percent of the reference 1RM, and that 1RM in kg (blank = best estimate from the log) */ pct?: number; ref?: number }
 export interface ExerciseDef {
   name: string; /** primary muscle: the one that limits the set */ muscle: string; unit: Unit; increment: number; guessed?: boolean;
   /** secondary muscles and the share of a set each one earns (0 to 1) */ contrib?: Record<string, number>;
@@ -50,6 +53,7 @@ export interface ExerciseDef {
   /** kg on the implement with no plates, for example a leg press sled */ base?: number;
   /** note shown every time this exercise is logged */ note?: string;
   /** RIR type a new plan row starts with */ rirType?: string;
+  /** load progression scheme, double progression when missing */ prog?: ProgSpec;
   /** vertical rise of the load over limb travel, gives the true resistance */ ma?: MechSpec;
   /** lever geometry, used to show the effective load at the bottom and top */ lever?: LeverSpec;
 }
