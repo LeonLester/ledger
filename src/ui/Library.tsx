@@ -1,12 +1,14 @@
 import { useMemo, useState, type CSSProperties } from "react";
-import { Plus, Trash2, Wand2, X } from "lucide-react";
+import { Copy, Plus, Trash2, Wand2, X } from "lucide-react";
 import { useStore } from "../store";
 import { muscleColor } from "../lib/groups";
 import { suggestContrib } from "../lib/muscles";
 import { defaultIncrement } from "../lib/math";
 import { DEFAULT_RIR_TYPES } from "../lib/rir";
 import type { ExerciseDef, Unit } from "../types";
-import { Sheet } from "./common";
+import { DecBox, Seg, Sheet } from "./common";
+import { LeverSheet } from "./Lever";
+import { distFit, r1, trueRes } from "../lib/mech";
 
 const SHARES = [0.25, 0.33, 0.5, 0.75, 1];
 const BW_SHARES = [0, 0.25, 0.33, 0.5, 0.65, 0.75, 0.9, 1];
@@ -65,18 +67,22 @@ export function Library() {
         <span className="faint xs">{count} exercises. A ? marks a guessed muscle.</span>
         <button className="btn sm" onClick={() => say(`Added contributors to ${suggestAllContrib()} exercises`)}><Wand2 size={16} /> Suggest contributors</button>
       </div>
-      {edit && <ExerciseEditor name={edit === "new" ? null : edit} muscles={muscles} onClose={() => setEdit(null)} />}
+      {edit && <ExerciseEditor key={edit} name={edit === "new" ? null : edit} muscles={muscles} onClose={() => setEdit(null)} onDuplicate={(n) => setEdit(n)} />}
     </section>
   );
 }
 
-export function ExerciseEditor({ name, muscles, onClose, initialName, onSaved }: { name: string | null; muscles: string[]; onClose: () => void; initialName?: string; onSaved?: (name: string) => void }) {
+export function ExerciseEditor({ name, muscles, onClose, initialName, onSaved, onDuplicate }: { name: string | null; muscles: string[]; onClose: () => void; initialName?: string; onSaved?: (name: string) => void; onDuplicate?: (name: string) => void }) {
   const { library, setExercise, removeExercise, renameExercise, say } = useStore();
   const def = name ? library[name] : undefined;
   const [f, setF] = useState({
     name: def?.name ?? initialName ?? "", muscle: def?.muscle ?? "", unit: (def?.unit ?? "kg") as Unit, step: String(def?.increment ?? 2.5),
     bwf: def?.bwf ?? 0, base: def?.base ? String(def.base) : "", note: def?.note ?? "", rirType: def?.rirType ?? "",
   });
+  const [mode, setMode] = useState<"none" | "dist" | "lever">(def?.lever ? "lever" : def?.ma ? "dist" : "none");
+  const [ma, setMa] = useState({ dxVer: def?.ma?.dxVer ?? 0, dx: def?.ma?.dx ?? 0 });
+  const [leverOpen, setLeverOpen] = useState(false);
+  const [probe, setProbe] = useState(100);
   const types = useStore.getState().settings.rirTypes ?? DEFAULT_RIR_TYPES;
   const [rows, setRows] = useState<{ m: string; f: number }[]>(Object.entries(def?.contrib ?? {}).map(([m, v]) => ({ m, f: v })));
   const setRow = (i: number, p: Partial<{ m: string; f: number }>) => setRows(rows.map((r, k) => (k === i ? { ...r, ...p } : r)));
@@ -93,6 +99,8 @@ export function ExerciseEditor({ name, muscles, onClose, initialName, onSaved }:
     setExercise(key, {
       muscle: f.muscle.trim(), unit: f.unit, increment: num(f.step) || defaultIncrement(f.unit),
       contrib: Object.keys(contrib).length ? contrib : undefined, bwf: f.bwf || undefined, base: num(f.base) || undefined, note: f.note.trim() || undefined, rirType: f.rirType || undefined,
+      ma: mode === "dist" && distFit(ma) ? { dxVer: ma.dxVer, dx: ma.dx } : undefined,
+      ...(mode === "lever" ? {} : { lever: undefined }),
     });
     say(name ? "Saved" : `${nm} added`); onSaved?.(key); onClose();
   };
@@ -131,9 +139,38 @@ export function ExerciseEditor({ name, muscles, onClose, initialName, onSaved }:
           <p className="faint xs">What you log is added to these. Log a negative weight such as -20 for an assisted pull-up. Estimated 1RM, records and tonnage use the total.</p>
         </div>
 
+        <div className="stack" style={{ gap: 8 }}>
+          <b>True resistance</b>
+          <p className="faint xs">Machines rarely load you with the weight on the stack. Enter how the load moves and the logger shows the real resistance next to the weight.</p>
+          <Seg full value={mode} onChange={setMode} label="True resistance method" options={[{ v: "none", label: "Off" }, { v: "dist", label: "Distances" }, { v: "lever", label: "Lever" }]} />
+          {mode === "dist" && (
+            <>
+              <div className="row wrap">
+                <label className="field" style={{ flex: "1 1 130px" }}><span>Load rises (vertical)</span><DecBox value={ma.dxVer || null} empty min={0.1} max={10000} label="Vertical distance the load moves" onCommit={(n) => setMa({ ...ma, dxVer: n ?? 0 })} /></label>
+                <label className="field" style={{ flex: "1 1 130px" }}><span>Your limb travels</span><DecBox value={ma.dx || null} empty min={0.1} max={10000} label="Distance your limb or body moves" onCommit={(n) => setMa({ ...ma, dx: n ?? 0 })} /></label>
+              </div>
+              <p className="faint xs">Measure both over the same rep, in any unit. A 45 degree leg press: the sled travels 100 cm and rises 71 cm, so 100 kg feels like 71 kg.</p>
+            </>
+          )}
+          {mode === "dist" && distFit(ma) && (
+            <div className="row" style={{ alignItems: "end" }}>
+              <label className="field" style={{ width: 110 }}><span>Weight ({f.unit})</span><DecBox value={probe} min={1} max={2000} label="Example weight" onCommit={(n) => setProbe(n ?? 100)} /></label>
+              <p className="small" style={{ paddingBottom: 12 }}>feels like <b className="num">{r1(trueRes(distFit(ma)!, probe))} {f.unit}</b></p>
+            </div>
+          )}
+          {mode === "lever" && (name
+            ? <div className="row wrap"><button className="btn" onClick={() => setLeverOpen(true)}>{def?.lever ? "Edit lever geometry" : "Set lever geometry"}</button><span className="faint xs">{def?.lever ? "Saved. True resistance uses the average over the rep." : "Not set yet."}</span></div>
+            : <p className="faint xs">Add the exercise first, then open it to set the lever geometry.</p>)}
+          {leverOpen && name && <LeverSheet exercise={name} weight={null} onClose={() => setLeverOpen(false)} />}
+        </div>
+
         <label className="field"><span>Note shown every time you log this exercise</span><textarea className="input" style={{ minHeight: 84, padding: 10 }} value={f.note} onChange={(e) => setF({ ...f, note: e.target.value })} placeholder="Seat setting, grip, pin position" /></label>
 
         <button className="btn primary" onClick={save}>{name ? "Save" : "Add to library"}</button>
+        {name && def && onDuplicate && <button className="btn" onClick={() => {
+          let k = 1; while (library[`${name} (${k})`]) k++;
+          const copy = `${name} (${k})`; setExercise(copy, { ...def, name: copy }); say(`Duplicated as ${copy}. Rename it to tell the machines apart.`); onDuplicate(copy);
+        }}><Copy size={16} /> Duplicate</button>}
         {name && <button className="btn danger" onClick={() => confirm(`Remove ${name} from the library? Logged history is kept.`) && (removeExercise(name), onClose())}><Trash2 size={16} /> Remove from library</button>}
       </div>
     </Sheet>

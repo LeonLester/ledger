@@ -41,6 +41,8 @@ export interface LeverSpec {
   /** empty arm mass in kg and the distance from the pivot to its centre */ armMass: number; armCom: number;
   path: "arc" | "fixed"; /** fixed pull direction in degrees from level */ pull: number;
 }
+/** how far the load rises and how far the limb travels, any length unit: true resistance is the logged load times rise over travel */
+export interface MechSpec { dxVer: number; dx: number }
 export interface ExerciseDef {
   name: string; /** primary muscle: the one that limits the set */ muscle: string; unit: Unit; increment: number; guessed?: boolean;
   /** secondary muscles and the share of a set each one earns (0 to 1) */ contrib?: Record<string, number>;
@@ -48,6 +50,7 @@ export interface ExerciseDef {
   /** kg on the implement with no plates, for example a leg press sled */ base?: number;
   /** note shown every time this exercise is logged */ note?: string;
   /** RIR type a new plan row starts with */ rirType?: string;
+  /** vertical rise of the load over limb travel, gives the true resistance */ ma?: MechSpec;
   /** lever geometry, used to show the effective load at the bottom and top */ lever?: LeverSpec;
 }
 

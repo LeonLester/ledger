@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { ArrowLeft, Disc3, Flame, Link2, Zap, Plus, Minus, Repeat, StickyNote, Ruler, Trash2, Unlink2, Video } from "lucide-react";
 import { muscleColor, runs } from "../lib/groups";
 import { PR_LABEL, sessionPrs } from "../lib/pr";
 import { TechSheet } from "./Technique";
 import { LeverSheet } from "./Lever";
 import { summarize } from "../lib/lever";
+import { fitOf, r1, trueRes, weightFor } from "../lib/mech";
 import { useStore } from "../store";
 import { bestE1rm, defaultIncrement, fmtW, isMyo, PLATE_COLORS, plateLoad, warmups, workedSets } from "../lib/math";
 import { effectiveSessions, feedbackDelta, pumpLabels, sorenessLabels, suggestTarget, workloadLabels } from "../lib/progression";
@@ -24,8 +25,9 @@ function RepsCell({ s, placeholder, onChange }: { s: SetLog; placeholder: string
 /** Weight with a local text state, so a minus sign or a trailing decimal point survives typing. Negative weights are for assistance. */
 function WeightCell({ value, placeholder, label, text, onChange }: { value: number | null; placeholder: string; label: string; text: boolean; onChange: (v: number | null) => void }) {
   const [t, setT] = useState(value == null ? "" : String(value));
-  useEffect(() => { if ((t === "" ? null : Number(t.replace(",", "."))) !== value && !/^-?\d*[.,]?$/.test(t)) setT(value == null ? "" : String(value)); /* eslint-disable-next-line */ }, [value]);
-  return <input className="cell" inputMode={text ? "text" : "decimal"} aria-label={label} placeholder={placeholder} value={t}
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => { if (document.activeElement !== ref.current && (t === "" ? null : Number(t.replace(",", "."))) !== value) setT(value == null ? "" : String(value)); /* eslint-disable-next-line */ }, [value]);
+  return <input ref={ref} className="cell" inputMode={text ? "text" : "decimal"} aria-label={label} placeholder={placeholder} value={t}
     onChange={(e) => { const v = e.target.value; if (!/^-?\d*[.,]?\d*$/.test(v)) return; setT(v); const n = Number(v.replace(",", ".")); onChange(v === "" ? null : Number.isFinite(n) && !/^-?[.,]?$/.test(v) ? n : value); }} />;
 }
 
@@ -63,8 +65,13 @@ export function SessionView({ id }: { id: string }) {
   const grp = runs(sess.exercises);
 
   const swapTo = (i: number, name: string) => {
-    const d = useStore.getState().library[name]; const lg = lastLog(name, sessions, sess);
-    updateEx(id, i, (x) => ({ ...x, bwf: undefined, base: undefined, bw: undefined, ...st.extrasOf(name), exercise: name, unit: d?.unit ?? x.unit, sets: x.sets.map((s) => ({ ...s, weight: lg ? lg.sets[0]?.weight ?? null : null, reps: null, myo: [], done: false })) }));
+    const lib = useStore.getState().library; const d = lib[name]; const lg = lastLog(name, sessions, sess);
+    const from = fitOf(lib[sess.exercises[i].exercise]), to = fitOf(d), inc = d?.increment ?? 2.5;
+    // keep the same true resistance when either machine has its mechanical advantage set
+    const match = (w: number | null) => (w == null || (!from && !to) ? null : (() => { const r = from ? trueRes(from, w) : w; const n = to ? weightFor(to, r) : r; return n > 0 ? Math.round(n / inc) * inc : null; })());
+    const matched = (from || to) && sess.exercises[i].sets.some((s) => s.weight != null);
+    updateEx(id, i, (x) => ({ ...x, bwf: undefined, base: undefined, bw: undefined, ...st.extrasOf(name), exercise: name, unit: d?.unit ?? x.unit, sets: x.sets.map((s) => ({ ...s, weight: matched ? match(s.weight) : lg ? lg.sets[0]?.weight ?? null : null, reps: null, myo: [], done: false })) }));
+    if (matched) st.say("Weights matched to the same true resistance");
     setMenu(null); setQ("");
   };
   const patchSet = (i: number, j: number, p: Partial<SetLog>) => updateEx(id, i, (e) => ({ ...e, sets: e.sets.map((s, k) => (k === j ? { ...s, ...p } : s)) }));
@@ -104,6 +111,7 @@ export function SessionView({ id }: { id: string }) {
         const item = plan?.items.find((p) => p.letter === ex.letter && p.exercise === ex.exercise) ?? plan?.items.find((p) => p.exercise === ex.exercise) ?? plan?.items[i];
         const last = lastLog(ex.exercise, sessions, sess);
         const def = library[ex.exercise];
+        const fit = fitOf(def);
         const tgt = item ? suggestTarget(item, last, def) : null;
         const inc = def?.increment ?? defaultIncrement(ex.unit ?? "kg");
         const unit = ex.unit ?? "kg";
@@ -139,22 +147,23 @@ export function SessionView({ id }: { id: string }) {
             {item?.desc && <div className="target"><span>Prescribed <b>{item.desc}</b></span></div>}
             {tgt && !item?.scheme && !(item?.pct != null && item.lift && settings.tms?.[item.lift]) && (
               <div className="target">
-                {tgt.weight != null ? <span>Aim <b className="num">{fmtW(tgt.weight)} {unit}</b> for <b>{item?.repLo}{item && item.repHi !== item.repLo ? `-${item.repHi}` : ""}</b> reps</span> : <span>Aim for <b>{item?.repLo}{item && item.repHi !== item.repLo ? `-${item.repHi}` : ""}</b> reps</span>}
+                {tgt.weight != null ? <span>Aim <b className="num">{fmtW(tgt.weight)} {unit}</b>{fit ? <> (true <b className="num">{fmtW(r1(trueRes(fit, tgt.weight)))}</b>)</> : null} for <b>{item?.repLo}{item && item.repHi !== item.repLo ? `-${item.repHi}` : ""}</b> reps</span> : <span>Aim for <b>{item?.repLo}{item && item.repHi !== item.repLo ? `-${item.repHi}` : ""}</b> reps</span>}
                 <span className="faint">{tgt.note}</span>
               </div>
             )}
             <div className="sets">
-              <div className="set head"><span /><span>Last</span><span style={{ textAlign: "center" }}>{unit}</span><span style={{ textAlign: "center" }}>Reps</span><span style={{ textAlign: "center" }}>{rpeMode ? "RPE" : "RIR"}</span><span /></div>
+              <div className={`set head ${fit ? "tr" : ""}`}><span /><span>Last</span><span style={{ textAlign: "center" }}>{unit}</span>{fit && <span style={{ textAlign: "center" }} title="True resistance">True</span>}<span style={{ textAlign: "center" }}>Reps</span><span style={{ textAlign: "center" }}>{rpeMode ? "RPE" : "RIR"}</span><span /></div>
               {ex.sets.map((s, j) => {
                 const p = prevSets[j] ?? prevSets[prevSets.length - 1];
                 const rirClass = s.rir == null ? "" : s.rir <= 0 ? "rir-1" : s.rir === 1 ? "rir-2" : s.rir === 2 ? "rir-3" : "rir-4";
                 return (
                   <div key={j} className="set-block">
-                  <div className={`set ${s.done ? "done" : ""}`}>
+                  <div className={`set ${fit ? "tr" : ""} ${s.done ? "done" : ""}`}>
                     <button className={`n num myo-toggle ${isMyo(s) ? "on" : ""}`} aria-pressed={isMyo(s)} aria-label={`Set ${j + 1} myo-reps`} title="Tap to make this a myo-rep set" disabled={readOnly}
                       onClick={() => patchSet(i, j, isMyo(s) ? { myoOn: false, myo: [] } : { myoOn: true })}>{isMyo(s) ? "M" : j + 1}</button>
                     <span className="prev num">{p && p.reps != null ? `${fmtW(p.weight) || "-"}x${repsText(p)}` : "-"}</span>
                     <WeightCell value={s.weight} text={!!ex.bwf} label={`Set ${j + 1} weight`} placeholder={fmtW(p?.weight ?? null) || "0"} onChange={(v) => patchSet(i, j, { weight: v })} />
+                    {fit && <WeightCell value={s.weight == null ? null : r1(trueRes(fit, s.weight))} text={false} label={`Set ${j + 1} true resistance`} placeholder="-" onChange={(v) => patchSet(i, j, { weight: v == null ? null : Math.round(weightFor(fit, v) * 10) / 10 })} />}
                     <RepsCell s={s} placeholder={s.tr ? `${s.tr}${s.amrap ? "+" : ""}` : item?.repLo ? String(item.repLo) : "0"} onChange={(v) => patchSet(i, j, v)} />
                     <EffCell rir={s.rir} rpe={rpeMode} label={`Set ${j + 1} ${rpeMode ? "RPE" : "reps in reserve"}`} placeholder={ex.rir != null ? String(rpeMode ? 10 - ex.rir : ex.rir) : "-"} onChange={(v) => patchSet(i, j, { rir: v })} />
                     <button className={`disc ${rirClass}`} aria-pressed={!!s.done} aria-label={`Set ${j + 1} done`} onClick={() => toggleSet(id, i, j)}>

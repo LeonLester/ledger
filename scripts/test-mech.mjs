@@ -1,0 +1,13 @@
+import { fitOf, trueRes, weightFor } from "../src/lib/mech.ts";
+let fails = 0;
+const ok = (c, m) => { if (!c) { fails++; console.log("FAIL", m); } else console.log("ok  ", m); };
+const near = (a, b, e = 0.05) => Math.abs(a - b) <= e;
+const lp = fitOf({ ma: { dxVer: 71, dx: 100 } });
+ok(near(trueRes(lp, 100), 71), "leg press 45 degrees, 100 kg feels like 71");
+ok(near(weightFor(lp, 71), 100), "71 kg true resistance needs 100 kg");
+ok(fitOf({}) === null && fitOf({ ma: { dxVer: 0, dx: 5 } }) === null, "no data gives no fit");
+const lev = fitOf({ lever: { loadArm: 200, userArm: 100, start: 0, end: 0.0001, offset: 0, armMass: 0, armCom: 0, path: "arc", pull: 90 } });
+ok(near(lev.a, 2, 0.001) && near(lev.b, 0, 0.001), "lever with equal-ish angles: arm ratio 2");
+const lev2 = fitOf({ lever: { loadArm: 100, userArm: 100, start: 0, end: 0.0001, offset: 0, armMass: 10, armCom: 100, path: "arc", pull: 90 } });
+ok(near(trueRes(lev2, 50), 60, 0.01) && near(weightFor(lev2, 60), 50, 0.01), "arm mass adds a constant");
+console.log(fails ? `${fails} failed` : "all passed"); process.exit(fails ? 1 : 0);

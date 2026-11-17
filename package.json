@@ -11,7 +11,7 @@
     "deploy": "npm run build && wrangler deploy",
     "build:web": "node scripts/build-web.mjs",
     "android:sync": "npm run build && npm run build:web && cap sync android",
-    "test": "esbuild scripts/test-core.mjs --bundle --platform=node --format=esm --log-level=error --outfile=.test-out.mjs && node .test-out.mjs && node scripts/test-lever.mjs",
+    "test": "esbuild scripts/test-core.mjs --bundle --platform=node --format=esm --log-level=error --outfile=.test-out.mjs && node .test-out.mjs && node scripts/test-lever.mjs && esbuild scripts/test-mech.mjs --bundle --platform=node --format=esm --log-level=error --outfile=.test-mech.mjs && node .test-mech.mjs",
     "android:build": "npm run android:sync && cd android && ./gradlew assembleRelease"
   },
   "dependencies": {
