@@ -14,6 +14,25 @@ const REST = "Rest";
 const blank = (): PlanItem => ({ letter: "~", exercise: "", sets: 3, repLo: 8, repHi: 12, rir: 2 });
 const num = (v: string, d: number | null) => { const n = parseInt(v, 10); return Number.isFinite(n) ? n : d; };
 
+/** Exercise name field with a solid suggestion list. The native datalist popup renders see-through on Android, so this draws its own. */
+function ExerciseInput({ names, value, onPick }: { names: string[]; value: string; onPick: (v: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const q = value.trim().toLowerCase();
+  const hits = useMemo(() => (open ? names.filter((n) => n.toLowerCase() !== q && (!q || n.toLowerCase().includes(q))).slice(0, 8) : []), [open, names, q]);
+  return (
+    <div style={{ position: "relative", flex: 1, minWidth: 0 }}>
+      <input className="input" placeholder="Exercise" aria-label="Exercise" autoComplete="off" value={value} onFocus={() => setOpen(true)} onBlur={() => setOpen(false)} onChange={(e) => { setOpen(true); onPick(e.target.value); }} />
+      {hits.length > 0 && (
+        <ul role="listbox" style={{ position: "absolute", left: 0, right: 0, top: "calc(100% + 4px)", zIndex: 30, margin: 0, padding: 4, listStyle: "none", background: "var(--s2)", border: "1px solid var(--line-strong)", borderRadius: "var(--rc)", boxShadow: "0 8px 24px rgba(0,0,0,.28)", maxHeight: 280, overflowY: "auto" }}>
+          {hits.map((n) => (
+            <li key={n} role="option" aria-selected={false} style={{ padding: "11px 10px", borderRadius: 6, cursor: "pointer" }} onPointerDown={(e) => { e.preventDefault(); onPick(n); setOpen(false); }}>{n}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 /** Edit a list of sessions: names, exercises, sets, rep range and RIR. Used by the program builder and by the plan editor. */
 export function SessionsEditor({ sessions, onChange, ramp = true }: { sessions: PlanSession[]; onChange: (s: PlanSession[]) => void; ramp?: boolean }) {
   const names = useStore((s) => Object.keys(s.library).sort());
@@ -28,7 +47,6 @@ export function SessionsEditor({ sessions, onChange, ramp = true }: { sessions: 
   const move = (i: number, j: number, d: number) => setSess(i, (s) => { const a = [...s.items]; const t = j + d; if (t < 0 || t >= a.length) return s; [a[j], a[t]] = [a[t], a[j]]; return { ...s, items: relabel(a) }; });
   return (
     <div className="stack-lg">
-      <datalist id="ex-names">{names.map((n) => <option key={n} value={n} />)}</datalist>
       {creating && <ExerciseEditor name={null} initialName={creating.name} muscles={allMuscles} onClose={() => setCreating(null)} onSaved={(n) => setItem(creating.i, creating.j, { exercise: n })} />}
       {sessions.map((s, i) => (
         <section key={i} className="panel stack" style={{ padding: 14 }}>
@@ -46,7 +64,7 @@ export function SessionsEditor({ sessions, onChange, ramp = true }: { sessions: 
                   <span className="letter" style={{ background: `color-mix(in srgb, ${muscleColor(muscleOf(it.exercise))} 55%, var(--s1))`, color: "#0b0d10", borderColor: muscleColor(muscleOf(it.exercise)) }}>{it.letter === "~" ? "A1" : it.letter}</span>
                   {j > 0 && <button className="btn ghost sm" aria-pressed={linked} aria-label={linked ? "Remove from superset" : "Superset with the exercise above"} onClick={() => setSess(i, (x) => ({ ...x, items: linkPrev(x.items, j, !linked) }))}>{linked ? <Unlink2 size={16} color="var(--accent)" /> : <Link2 size={16} />}{linked ? "Unlink" : "Superset"}</button>}
                 </div>
-                <div className="row" style={{ gap: 6, flexWrap: "nowrap" }}><input className="input" list="ex-names" placeholder="Exercise" aria-label="Exercise" value={it.exercise} onChange={(e) => { const d = library[e.target.value]; setItem(i, j, { exercise: e.target.value, ...(d?.rirType && !it.rirType && types.some((t) => t.id === d.rirType) ? { rirType: d.rirType } : {}) }); }} />
+                <div className="row" style={{ gap: 6, flexWrap: "nowrap" }}><ExerciseInput names={names} value={it.exercise} onPick={(v) => { const d = library[v]; setItem(i, j, { exercise: v, ...(d?.rirType && !it.rirType && types.some((t) => t.id === d.rirType) ? { rirType: d.rirType } : {}) }); }} />
                   <button className="btn sm" style={{ flex: "none" }} aria-label="Create a new exercise" onClick={() => setCreating({ i, j, name: it.exercise && !library[it.exercise] ? it.exercise : "" })}><Plus size={16} /></button></div>
                 <div className="row" style={{ gap: 8, alignItems: "end", flexWrap: "wrap" }}>
                   <label className="field" style={{ width: 66 }}><span className="xs">{ramp ? "First wk" : "Sets"}</span><IntBox label="Sets" min={1} max={30} value={it.sets} onCommit={(n) => setItem(i, j, { sets: n ?? it.sets })} /></label>
