@@ -33,3 +33,22 @@ export const trueRes = (f: Fit, w: number, extra = 0) => f.a * (w + extra) + f.b
 export const weightFor = (f: Fit, r: number, extra = 0) => (r - f.b) / f.a - extra;
 export const r1 = (n: number) => Math.round(n * 10) / 10;
 export type { ExLog };
+
+/** the weights you can lift for 1 to `max` reps, from one tested set. `extra` is the tare and bodyweight share in the exercise's unit.
+ *  Each row says how far its rep count is from the tested one, because the estimate gets looser the further it is extrapolated. */
+export interface RepRow { reps: number; weight: number; res: number; pct: number; gap: number; trust: "high" | "mid" | "low" }
+export function repTable(
+  tested: { weight: number; reps: number }, opts: { fit: Fit | null; extra: number; inc: number; max?: number; e1: (res: number, reps: number) => number; at: (e1: number, reps: number) => number },
+): { e1: number; rows: RepRow[] } {
+  const fit = opts.fit ?? { a: 1, b: 0 };
+  const res = trueRes(fit, tested.weight, opts.extra);
+  const e1 = opts.e1(res, tested.reps);
+  const rows: RepRow[] = [];
+  for (let n = 1; n <= (opts.max ?? 15); n++) {
+    const r = opts.at(e1, n);
+    const raw = weightFor(fit, r, opts.extra);
+    const gap = Math.abs(n - tested.reps);
+    rows.push({ reps: n, weight: Math.round(raw / opts.inc) * opts.inc, res: r, pct: e1 > 0 ? (r / e1) * 100 : 0, gap, trust: gap <= 2 ? "high" : gap <= 5 ? "mid" : "low" });
+  }
+  return { e1, rows };
+}

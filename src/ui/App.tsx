@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { BarChart3, CalendarRange, Dumbbell, LogOut, Menu, Library as LibraryIcon, PanelLeftClose, PanelLeftOpen, Ruler, Settings2, Shield, TrendingUp, Users, X } from "lucide-react";
+import { BarChart3, CalendarRange, Dumbbell, LogOut, Menu, Library as LibraryIcon, PanelLeftClose, PanelLeftOpen, Calculator, Ruler, Settings2, Shield, TrendingUp, Users, X } from "lucide-react";
 import { useStore } from "../store";
 import { Train } from "./Train";
 import { Plan } from "./Plan";
@@ -7,6 +7,7 @@ import { Volume } from "./Volume";
 import { Progress } from "./Progress";
 import { More } from "./More";
 import { Exercises, Machines } from "./Tools";
+import { RepMax } from "./RepMax";
 import { Welcome } from "./Programs";
 import { canUpdate, checkUpdate, isNative, ringNow, scheduleRest, syncSystemBars } from "../native";
 import { Auth } from "./Auth";
@@ -19,9 +20,9 @@ import { Admin } from "./Admin";
 
 const TABS = [
   { id: "train", label: "Train", Icon: Dumbbell }, { id: "plan", label: "Plan", Icon: CalendarRange },
-  { id: "volume", label: "Volume", Icon: BarChart3 }, { id: "progress", label: "Progress", Icon: TrendingUp }, { id: "coach", label: "Clients", Icon: Users }, { id: "exercises", label: "Exercises", Icon: LibraryIcon, side: true }, { id: "machines", label: "Machines", Icon: Ruler, side: true }, { id: "more", label: "More", Icon: Settings2 },
+  { id: "volume", label: "Volume", Icon: BarChart3 }, { id: "progress", label: "Progress", Icon: TrendingUp }, { id: "coach", label: "Clients", Icon: Users }, { id: "exercises", label: "Exercises", Icon: LibraryIcon, side: true }, { id: "machines", label: "Machines", Icon: Ruler, side: true }, { id: "repmax", label: "Rep max", Icon: Calculator, side: true }, { id: "more", label: "More", Icon: Settings2 },
 ] as readonly { id: string; label: string; Icon: typeof Dumbbell; side?: boolean }[];
-type TabId = "train" | "plan" | "volume" | "progress" | "coach" | "exercises" | "machines" | "more";
+type TabId = "train" | "plan" | "volume" | "progress" | "coach" | "exercises" | "machines" | "repmax" | "more";
 
 const initials = (n: string) => n.trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("") || "?";
 
@@ -148,7 +149,7 @@ export function App() {
       {drawer && <Drawer tab={tab} onClose={() => setDrawer(false)} onPick={(t) => { setTab(t as typeof tab); useStore.getState().closeSession(); setDrawer(false); }} />}
       <main className="main" id="main" data-open={openSession ? "1" : undefined}>
         <Boundary reset={tab}>{noProgram && ["train", "plan", "volume", "progress"].includes(tab) ? <Welcome /> : <>
-          {tab === "train" && <Train />}{tab === "plan" && <Plan />}{tab === "volume" && <Volume />}{tab === "progress" && <Progress />}{tab === "coach" && <Coach />}{tab === "exercises" && <Exercises />}{tab === "machines" && <Machines />}{tab === "more" && <More />}{tab === "admin" && user?.admin && <Admin onBack={() => setTab("more")} />}</>}</Boundary>
+          {tab === "train" && <Train />}{tab === "plan" && <Plan />}{tab === "volume" && <Volume />}{tab === "progress" && <Progress />}{tab === "coach" && <Coach />}{tab === "exercises" && <Exercises />}{tab === "machines" && <Machines />}{tab === "repmax" && <RepMax />}{tab === "more" && <More />}{tab === "admin" && user?.admin && <Admin onBack={() => setTab("more")} />}</>}</Boundary>
       </main>
       <RestBar />
       {toast && <div className="toast" role="status">{toast}</div>}

@@ -1,4 +1,4 @@
-import { extraLoad, fitOf, resFit, trueRes, weightFor } from "../src/lib/mech.ts";
+import { extraLoad, fitOf, repTable, resFit, trueRes, weightFor } from "../src/lib/mech.ts";
 let fails = 0;
 const ok = (c, m) => { if (!c) { fails++; console.log("FAIL", m); } else console.log("ok  ", m); };
 const near = (a, b, e = 0.05) => Math.abs(a - b) <= e;
@@ -16,4 +16,10 @@ ok(near(trueRes(lp, 100, xl), 99.4, 0.01) && near(weightFor(lp, 99.4, xl), 100, 
 const assist = resFit(undefined, extraLoad({ bwf: 1, bw: 80 }));
 ok(near(trueRes(assist, -30, 80), 50) && near(weightFor(assist, 50, 80), -30), "assisted pull-up: 80 kg bodyweight with -30 assistance is 50");
 ok(resFit(undefined, 0) === null, "no extras, no column");
+const e1 = (w, r) => (r <= 1 ? w : w * (1 + r / 30)), at = (e, n) => (n <= 1 ? e : e / (1 + n / 30));
+const t1 = repTable({ weight: 100, reps: 5 }, { fit: null, extra: 0, inc: 2.5, e1, at });
+ok(near(t1.e1, 116.67, 0.01) && t1.rows[0].weight === 117.5 && t1.rows[4].weight === 100, "rep table: 100 x 5 round trips, 1RM about 117.5");
+ok(t1.rows[4].trust === "high" && t1.rows[7].trust === "mid" && t1.rows[14].trust === "low", "trust fades with distance from the tested reps");
+const pu = repTable({ weight: 0, reps: 8 }, { fit: resFit(undefined, 80), extra: 80, inc: 1, e1, at });
+ok(near(pu.e1, 101.33, 0.01) && pu.rows[0].weight === 21, "pull-up at 80 kg bodyweight for 8: 1RM needs +21 added");
 console.log(fails ? `${fails} failed` : "all passed"); process.exit(fails ? 1 : 0);
