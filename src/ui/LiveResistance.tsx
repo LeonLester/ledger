@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Camera, Radio, Square } from "lucide-react";
 import { isNative } from "../native";
 import { PLATE_M, toGray, Tracker } from "../lib/barpath";
-import { startScaleScan, type ScaleReading } from "../lib/scale";
+import { SCALES, startScaleScan, type ScaleReading } from "../lib/scale";
 import { pairSamples, rate, resistanceByRom, type LiveSample } from "../lib/live";
 
 const W = 480;
@@ -43,7 +43,7 @@ function Trace({ reads }: { reads: { t: number; kg: number }[] }) {
 }
 
 /**
- * Live resistance. A Mi Body Composition Scale 2 under the user (or under the machine's foot plate) reports force in kg while the camera tracks the plate.
+ * Live resistance. A broadcasting Bluetooth scale (see SCALES in lib/scale.ts) under the user (or under the machine's foot plate) reports force in kg while the camera tracks the plate.
  * Stand on the scale with the load off, press "Zero", then load the machine: the scale then shows only what the machine adds.
  */
 export function LiveResistanceTool() {
@@ -153,6 +153,11 @@ export function LiveResistanceTool() {
   return (
     <div className="stack">
       <p className="dim small">Put the scale where the load passes through it: under your feet on the platform, or under a foot plate. Stand on it with the machine unloaded, press Zero, then do the set. The scale then shows only what the machine adds, and the camera pairs each reading with the height of the plate.</p>
+      <details>
+        <summary className="small" style={{ cursor: "pointer" }}>Supported scales</summary>
+        <ul className="small dim" style={{ margin: "8px 0 0", paddingLeft: 18 }}>{SCALES.map((s) => <li key={s.id}>{s.name} ({s.note})</li>)}</ul>
+        <p className="faint xs">These scales send their weight in Bluetooth broadcasts, so no pairing is needed and their own app keeps working. Scales that only talk to their app over a connection, such as most Renpho and QN models, cannot stream this way.</p>
+      </details>
       <div className="row wrap">
         <button className={`btn ${scanning ? "" : "primary"}`} onClick={toggleScan}><Radio size={18} /> {scanning ? "Stop scale" : "Connect scale"}</button>
         <button className="btn" onClick={zero} disabled={!last}>Zero</button>
@@ -161,7 +166,7 @@ export function LiveResistanceTool() {
       <div className="panel" style={{ padding: 14 }} aria-live="off">
         <div className="faint xs">Scale reading above zero</div>
         <div className="num" style={{ fontSize: "2.4rem", fontWeight: 700 }}>{shown == null ? "-" : `${f1(shown)} kg`}</div>
-        <div className="faint xs">{last ? `${last.stable ? "Stable" : "Moving"}, ${hz.toFixed(1)} readings per second, raw ${f1(last.kg)} kg, zero at ${f1(tare.current)} kg` : scanning ? "Step on the scale to wake it." : "Not connected."}</div>
+        <div className="faint xs">{last ? `${SCALES.find((s) => s.id === last.model)?.name ?? "Scale"}: ${last.stable ? "stable" : "moving"},${hz.toFixed(1)} readings per second, raw ${f1(last.kg)} kg, zero at ${f1(tare.current)} kg` : scanning ? "Step on the scale to wake it." : "Not connected."}</div>
         <Trace reads={reads.current} />
       </div>
       <video ref={vid} muted playsInline style={{ display: "none" }} />

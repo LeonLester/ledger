@@ -11,8 +11,10 @@
     "deploy": "npm run build && wrangler deploy",
     "build:web": "node scripts/build-web.mjs",
     "android:sync": "npm run build && npm run build:web && cap sync android",
-    "test": "esbuild scripts/test-core.mjs --bundle --platform=node --format=esm --log-level=error --outfile=.test-out.mjs && node .test-out.mjs && node scripts/test-lever.mjs && node scripts/test-scale.mjs && esbuild scripts/test-mech.mjs --bundle --platform=node --format=esm --log-level=error --outfile=.test-mech.mjs && node .test-mech.mjs && esbuild scripts/test-prog.mjs --bundle --platform=node --format=esm --log-level=error --outfile=.test-prog.mjs && node .test-prog.mjs && esbuild scripts/test-fitnotes.mjs --bundle --platform=node --format=esm --log-level=error --outfile=.test-fitnotes.mjs && node .test-fitnotes.mjs",
-    "android:build": "npm run android:sync && cd android && ./gradlew assembleRelease"
+    "test": "esbuild scripts/test-core.mjs --bundle --platform=node --format=esm --log-level=error --outfile=.test-out.mjs && node .test-out.mjs && node scripts/test-lever.mjs && node scripts/test-scale.mjs && node scripts/test-joints.mjs && esbuild scripts/test-mech.mjs --bundle --platform=node --format=esm --log-level=error --outfile=.test-mech.mjs && node .test-mech.mjs && esbuild scripts/test-prog.mjs --bundle --platform=node --format=esm --log-level=error --outfile=.test-prog.mjs && node .test-prog.mjs && esbuild scripts/test-fitnotes.mjs --bundle --platform=node --format=esm --log-level=error --outfile=.test-fitnotes.mjs && node .test-fitnotes.mjs",
+    "android:build": "npm run android:sync && cd android && ./gradlew assembleRelease",
+    "predev": "node scripts/copy-mediapipe.mjs",
+    "prebuild": "node scripts/copy-mediapipe.mjs"
   },
   "dependencies": {
     "@capacitor-community/bluetooth-le": "^8.4.0",
@@ -22,6 +24,7 @@
     "@capacitor/core": "^8.6.2",
     "@capacitor/local-notifications": "^8.3.1",
     "@fontsource-variable/roboto": "^5.3.0",
+    "@mediapipe/tasks-vision": "^1.2.3",
     "dexie": "^4.0.8",
     "lucide-react": "^0.453.0",
     "react": "^18.3.1",

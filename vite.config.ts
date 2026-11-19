@@ -3,6 +3,8 @@ import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig({
+  // pre-bundled up front: found lazily, the dev server re-optimizes mid-session and ends up with two copies of React
+  optimizeDeps: { include: ["@mediapipe/tasks-vision", "@capacitor-community/bluetooth-le"] },
   define: { __BUILD__: JSON.stringify(process.env.BUILD_NUMBER ?? "dev") },
   plugins: [
     react(),
@@ -23,7 +25,12 @@ export default defineConfig({
           { src: "icon-512.png", sizes: "512x512", type: "image/png", purpose: "any maskable" },
         ],
       },
-      workbox: { globPatterns: ["**/*.{js,css,html,svg,png,woff2}"], navigateFallbackDenylist: [/^\/api\//] },
+      workbox: {
+        globPatterns: ["**/*.{js,css,html,svg,png,woff2}"], navigateFallbackDenylist: [/^\/api\//],
+        // the pose model and WASM runtime are large, so they are cached the first time pose tracking runs instead of at install
+        runtimeCaching: [{ urlPattern: /^\/(mediapipe|models)\//, handler: "CacheFirst", options: { cacheName: "pose", expiration: { maxEntries: 8 } } }],
+        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
+      },
     }),
   ],
 });
