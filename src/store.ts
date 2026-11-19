@@ -12,6 +12,7 @@ import { effectiveSessions, feedbackDelta, mrvFor, suggestTarget, weekTarget } f
 import { exHistory, lastLog, mesoNum } from "./lib/selectors";
 import { CAT, LIFT_NAME } from "./data/catalog";
 import { sampleYear } from "./data/sampleYear";
+import { buildFitNotes, parseFitNotes, FN_MESO, FN_PREFIX, type FnSummary } from "./lib/fitnotes";
 import { TEMPLATES } from "./data/templates";
 import type { Generated } from "./data/templates";
 
@@ -48,6 +49,8 @@ interface State {
   loadSample(): Promise<void>;
   createProgram(build: (id: string) => Generated): Promise<void>;
   loadSampleYear(templateId: string): Promise<void>;
+  /** add a FitNotes history as finished sessions in its own meso; running it again replaces the previous import */
+  importFitNotes(csv: string): Promise<FnSummary>;
   setSettings(p: Partial<Settings>): void;
   avatar: string | null;
   setAvatar(url: string | null): void;
@@ -167,6 +170,23 @@ export const useStore = create<State>((set, get) => ({
     });
     await markAllDirty();
     await get().init();
+  },
+
+  async importFitNotes(csv) {
+    const { mesos, sessions, library } = get();
+    const old = mesos.find((m) => m.name === FN_MESO);
+    const id = old?.id ?? `m${Math.max(0, ...mesos.map((m) => mesoNum(m.id))) + 1}`;
+    const b = buildFitNotes(parseFitNotes(csv), library, { athleteId: ATHLETE, mesoId: id });
+    const drop = sessions.filter((s) => s.id.startsWith(FN_PREFIX) && s.meso === id).map((s) => s.id);
+    await db.transaction("rw", [db.mesos, db.sessions, db.kv], async () => {
+      if (drop.length) await db.sessions.bulkDelete(drop);
+      await db.mesos.put({ ...b.meso, athleteId: ATHLETE });
+      await db.sessions.bulkPut(b.sessions);
+      await db.kv.put({ key: "library", value: { ...library, ...b.library } });
+    });
+    await markAllDirty();
+    await get().init();
+    return b.summary;
   },
 
   async loadSample() {

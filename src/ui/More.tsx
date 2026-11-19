@@ -6,6 +6,7 @@ import { useStore } from "../store";
 import { sessionDate, sortSessions } from "../lib/selectors";
 import { DecBox, IntBox, MODE_NAMES, ModeMenu, Seg } from "./common";
 import { SamplePicker } from "./Samples";
+import { FitNotesImport } from "./FitNotesImport";
 import { DEFAULT_WARM, E1RM_LABEL, E1RM_TEXT, SCORE_LABEL, checkFormula, est1rm, formulas, parseWarm, warmText, compile, type E1rmKey, type ScoreKey } from "../lib/formulas";
 import { api } from "../api";
 import { LINK_PAGE, connectMealcost, disconnectMealcost, syncMealcost, useMealcost } from "../mealcost";
@@ -250,6 +251,7 @@ export function More() {
           <button className="btn" onClick={() => file.current?.click()}><Upload size={18} /> Restore backup</button>
           <button className="btn" onClick={exportCsv}><Download size={18} /> Log as CSV</button>
           <button className="btn" onClick={exportFitnotes} disabled={undated === dated.length}><Download size={18} /> FitNotes CSV</button>
+          <FitNotesImport />
         </div>
         {undated > 0 && <p className="faint xs">{undated} older sessions have no date. Set the mesocycle start date above and they are dated by your weekly split.</p>}
         <input ref={file} type="file" accept="application/json" hidden onChange={async (e) => { const f = e.target.files?.[0]; if (!f) return; try { await st.importAll(await f.text()); st.say("Backup restored"); } catch (err) { st.say((err as Error).message); } e.target.value = ""; }} />

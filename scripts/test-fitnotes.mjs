@@ -1,0 +1,27 @@
+import { readFileSync, existsSync, readdirSync } from "node:fs";
+import { parseCsv, parseFitNotes, buildFitNotes } from "../src/lib/fitnotes.ts";
+let bad = 0;
+const ok = (c, m) => { if (!c) { bad++; console.log("FAIL", m); } };
+ok(JSON.stringify(parseCsv('a,"b,c","d""e"\r\n1,2,3\n')) === JSON.stringify([["a", "b,c", 'd"e'], ["1", "2", "3"]]), "csv quoting");
+const small = "Date,Exercise,Category,Weight,Weight Unit,Reps,Distance,Distance Unit,Time,Comment\n2026-01-05,Bench Press,Chest,100.0,lbs,5,,,,felt good\n2026-01-05,Bench Press,Chest,100.0,lbs,4,,,,\n2026-01-05,Run,Cardio,0.0,kgs,0,3.0,km,,\n2026-01-06,Squat,Legs,0.0,kgs,0,,,,\n2026-01-12,Squat,Legs,140.0,kgs,5,,,,\n";
+const p = parseFitNotes(small);
+ok(p.rows.length === 3 && p.skipped.cardio === 1 && p.skipped.empty === 1, "skips " + JSON.stringify(p.skipped));
+const b = buildFitNotes(p, { "bench press": { name: "bench press", muscle: "Chest", unit: "lb", increment: 5 } }, { athleteId: "me", mesoId: "m9" });
+ok(b.sessions.length === 2 && b.sessions[0].exercises[0].exercise === "bench press", "case match");
+ok(b.sessions[0].exercises[0].unit === "lb" && b.sessions[0].exercises[0].note === "felt good", "unit and note");
+ok(b.meso.weeks.length === 2 && b.sessions[1].week === 2, "weeks " + b.meso.weeks.length);
+ok(b.library["Squat"]?.muscle === "Quads" && !b.library["bench press"], "library");
+let threw = false; try { parseFitNotes("x,y\n1,2"); } catch { threw = true; } ok(threw, "rejects other csv");
+const f = readdirSync(".").find((x) => /^orca_share.*\.csv$/.test(x)) ?? (existsSync("fitnotes.sample.csv") ? "fitnotes.sample.csv" : null);
+if (!f) { console.log("fitnotes ok (no real export present)"); process.exit(bad ? 1 : 0); }
+const real = readFileSync(f, "utf8");
+const rp = parseFitNotes(real);
+const rb = buildFitNotes(rp, {}, { athleteId: "me", mesoId: "m9" });
+console.log(JSON.stringify(rb.summary));
+ok(rb.summary.sets + rp.skipped.empty + rp.skipped.cardio + rp.skipped.bad === rp.total, "row accounting");
+ok(rb.summary.sessions === 174, "174 dates");
+const names = rb.sessions.map((s) => s.week + s.name); ok(new Set(names).size === names.length, "unique names per week");
+ok(rb.sessions.every((s) => s.exercises.every((e) => e.sets.every((x) => x.reps > 0))), "reps");
+console.log(Object.values(rb.library).filter((d) => d.muscle === "Unknown").map((d) => d.name));
+console.log(rb.sessions.slice(0, 3).map((s) => `${s.date} w${s.week} ${s.name} ${s.exercises.length}ex`));
+if (bad) process.exit(1); console.log("fitnotes ok");

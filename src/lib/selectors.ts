@@ -3,9 +3,11 @@ import { setCredit, workedSets, type MyoCfg } from "./math";
 
 const SPLIT = ["Upper 2", "Upper A (Mon)", "Upper 1 (Mon)", "Legs 1", "Lower 1", "Upper 3", "Legs 2", "Lower 2", "Upper 1", "Upper A", "Misc"];
 export const mesoNum = (id: string) => Number(id.replace(/\D/g, "")) || 0;
-export const orderKey = (s: Pick<Session, "meso" | "week" | "name" | "started">) => {
+export const orderKey = (s: Pick<Session, "meso" | "week" | "name" | "started"> & { date?: string | null }) => {
   const i = SPLIT.indexOf(s.name);
-  return mesoNum(s.meso) * 1e9 + s.week * 1e6 + (s.started ? 5e5 : 0) + (i < 0 ? 9 : i);
+  // the date only breaks ties between sessions of one week, so it stays below 1
+  const d = s.date ? ((Date.parse(s.date + "T12:00:00Z") / 864e5) % 1e5) / 1e5 : 0;
+  return mesoNum(s.meso) * 1e9 + s.week * 1e6 + (s.started ? 5e5 : 0) + (i < 0 ? 9 : i) + (Number.isFinite(d) ? d : 0);
 };
 export const sortSessions = (xs: Session[]) => [...xs].sort((a, b) => orderKey(a) - orderKey(b));
 
