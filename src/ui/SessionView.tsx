@@ -7,6 +7,8 @@ import { LeverSheet } from "./Lever";
 import { summarize } from "../lib/lever";
 import { extraLoad, r1, resFit, trueRes, weightFor } from "../lib/mech";
 import { useStore } from "../store";
+import { useSync } from "../sync";
+import { useShowAdvanced } from "../lib/mode";
 import { bestE1rm, defaultIncrement, fmtW, isMyo, PLATE_COLORS, plateLoad, warmups, workedSets } from "../lib/math";
 import { effectiveSessions, feedbackDelta, pumpLabels, sorenessLabels, suggestTarget, workloadLabels } from "../lib/progression";
 import { exHistory, lastLog, parseReps, repsText, sortSessions } from "../lib/selectors";
@@ -42,6 +44,7 @@ function EffCell({ rir, rpe, placeholder, label, onChange }: { rir: number | nul
 
 export function SessionView({ id }: { id: string }) {
   const st = useStore();
+  const showAdv = useShowAdvanced(useSync((s) => s.user?.role));
   const { sessions, settings, mesos, adjustments, library, feedback, muscleOf, closeSession, updateEx, toggleSet, bodyweight, split } = st;
   const sess = sessions.find((s) => s.id === id);
   const [menu, setMenu] = useState<{ i: number; kind: "warm" | "plates" | "note" | "swap" | "tech" | "lever" } | null>(null);
@@ -133,8 +136,8 @@ export function SessionView({ id }: { id: string }) {
                 <button className="btn ghost icon sm" aria-label="Plate calculator" onClick={() => setMenu({ i, kind: "plates" })}><Disc3 size={17} /></button>
                 <button className="btn ghost icon sm" aria-label="Swap exercise" onClick={() => setMenu({ i, kind: "swap" })}><Repeat size={17} /></button>
                 <button className="btn ghost icon sm" aria-label="Note" onClick={() => setMenu({ i, kind: "note" })}><StickyNote size={17} color={ex.note || def?.note ? "var(--accent)" : undefined} /></button>
-                <button className="btn ghost icon sm" aria-label="Machine mechanical advantage" onClick={() => setMenu({ i, kind: "lever" })}><Ruler size={17} color={def?.lever ? "var(--accent)" : undefined} /></button>
-                <button className="btn ghost icon sm" aria-label="Technique and bar path" onClick={() => setMenu({ i, kind: "tech" })}><Video size={17} color={ex.tech || ex.paths?.length ? "var(--accent)" : undefined} /></button>
+                {showAdv && <button className="btn ghost icon sm" aria-label="Machine mechanical advantage" onClick={() => setMenu({ i, kind: "lever" })}><Ruler size={17} color={def?.lever ? "var(--accent)" : undefined} /></button>}
+                {showAdv && <button className="btn ghost icon sm" aria-label="Technique and bar path" onClick={() => setMenu({ i, kind: "tech" })}><Video size={17} color={ex.tech || ex.paths?.length ? "var(--accent)" : undefined} /></button>}
               </div>
               </div>
             </div>

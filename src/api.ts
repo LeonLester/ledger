@@ -3,7 +3,7 @@ import { isNative, HOME } from "./native";
 const BASE = isNative ? HOME : "";
 const KEY = "ledger.auth";
 
-export interface Account { id: string; email: string; name: string; role: "athlete" | "coach"; coachId: string | null; coachName: string | null; invite: string | null; admin?: boolean }
+export interface Account { id: string; email: string; name: string; role: "athlete" | "coach"; coachId: string | null; coachName: string | null; invite: string | null; admin?: boolean; emailVerified?: boolean; consent?: number | null; notify?: boolean }
 export const loadAuth = (): { token: string; user: Account } | null => { try { return JSON.parse(localStorage.getItem(KEY) ?? "null"); } catch { return null; } };
 export const saveAuth = (a: { token: string; user: Account } | null) => { try { a ? localStorage.setItem(KEY, JSON.stringify(a)) : localStorage.removeItem(KEY); } catch { /* storage blocked */ } };
 

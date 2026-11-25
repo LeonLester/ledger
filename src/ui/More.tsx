@@ -11,6 +11,8 @@ import { DEFAULT_WARM, E1RM_LABEL, E1RM_TEXT, SCORE_LABEL, checkFormula, est1rm,
 import { api } from "../api";
 import { LINK_PAGE, connectMealcost, disconnectMealcost, syncMealcost, useMealcost } from "../mealcost";
 import { joinCoach, logout, syncNow, useSync } from "../sync";
+import { Devices, IntakeForm, NotifyToggle } from "./Account";
+import { useAdvanced, useShowAdvanced } from "../lib/mode";
 import { APK_URL, BUILD, canUpdate, checkUpdate, checkWebUpdate, installUpdate, isNative } from "../native";
 
 function save(name: string, text: string, type = "text/plain") {
@@ -167,6 +169,8 @@ export function More() {
   const [samples, setSamples] = useState(false);
   const [code, setCode] = useState("");
   const acct = useSync();
+  const showAll = useShowAdvanced(acct.user?.role);
+  const setAdv = useAdvanced((x) => x.set);
   const file = useRef<HTMLInputElement>(null);
   const muscles = [...new Set(Object.values(library).map((d) => d.muscle))].sort();
   const dated = sortSessions(sessions).map((s) => ({ s, d: sessionDate(s, settings.mesoStart, split) }));
@@ -194,14 +198,18 @@ export function More() {
         <div><b>{acct.user?.name}</b><div className="dim small">{acct.user?.email}{acct.user?.role === "coach" ? ", coach" : ""}</div></div>
         <p className="dim small" role="status">{acct.status === "syncing" ? "Syncing" : acct.status === "offline" ? "Offline. Changes sync when you are back online." : acct.status === "error" ? `Sync problem: ${acct.error}` : acct.last ? `Synced at ${new Date(acct.last).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "Not synced yet"}</p>
         <ProfilePhoto />
+        <NotifyToggle />
+        <Devices />
         {acct.user?.admin && <button className="btn" onClick={() => window.dispatchEvent(new CustomEvent("ledger:tab", { detail: "admin" }))}>Open admin dashboard</button>}
         {acct.user?.role === "athlete" && <CoachRequest />}
         {acct.user?.role === "coach" ? <p className="small">Your coach code is <b className="num" style={{ letterSpacing: ".1em" }}>{acct.user.invite}</b>. Clients enter it when they sign up.</p>
-          : acct.user?.coachId ? <div className="row between wrap"><span className="small">Your coach: <b>{acct.user.coachName ?? "linked"}</b>. They can see your log and send programs and feedback.</span><button className="btn sm" onClick={() => confirm("Stop sharing your log with your coach?") && api("/api/join", {}).then(() => { useSync.setState({ user: { ...acct.user!, coachId: null, coachName: null } }); })}>Leave coach</button></div>
+          : acct.user?.coachId ? <div className="row between wrap"><span className="small">Your coach: <b>{acct.user.coachName ?? "linked"}</b>. They can see your log, progress, profile and messages, and send you programs, feedback and plan changes. Leaving ends that access.</span><button className="btn sm" onClick={() => confirm("Stop sharing your log with your coach?") && api("/api/join", {}).then(() => { useSync.setState({ user: { ...acct.user!, coachId: null, coachName: null } }); })}>Leave coach</button></div>
             : <div className="row"><input className="input" style={{ maxWidth: 180 }} placeholder="Coach code" aria-label="Coach code" autoCapitalize="characters" value={code} onChange={(e) => setCode(e.target.value)} /><button className="btn" style={{ whiteSpace: "nowrap" }} disabled={!code.trim()} onClick={() => joinCoach(code.trim()).then(() => { st.say("Linked to your coach"); setCode(""); }).catch((e) => st.say(e.message))}>Join a coach</button></div>}
         <div className="row wrap"><button className="btn" onClick={() => void syncNow()}>Sync now</button><button className="btn" onClick={() => void logout()}>Log out</button>
           <button className="btn danger" onClick={() => confirm("Delete your account and all synced data? This cannot be undone. The copy on this device stays until you erase it.") && api("/api/account", undefined, "DELETE").then(() => logout(false)).catch((e) => st.say(e.message))}>Delete account</button></div>
       </section>
+
+      {acct.user?.role === "athlete" && <IntakeForm />}
 
       <section className="panel stack" style={{ padding: 16 }}>
         <h3>Training</h3>
@@ -211,6 +219,10 @@ export function More() {
         <div className="row"><label className="field" style={{ flex: 1 }}><span>Bar (kg)</span><DecBox label="Bar (kg)" min={1} max={100} value={settings.bar} onCommit={(n) => n != null && setSettings({ bar: n })} /></label>
           <label className="field" style={{ flex: 2 }}><span>Plates per side (kg)</span><input className="input num" defaultValue={settings.plates.join(", ")} onBlur={(e) => setSettings({ plates: e.target.value.split(/[ ,]+/).map(Number).filter((n) => n > 0) })} /></label></div>
         <div className="field"><span>Effort scale</span><Seg full value={settings.effort ?? "rir"} onChange={(effort) => setSettings({ effort })} options={[{ v: "rir", label: "RIR" }, { v: "rpe", label: "RPE" }]} label="Effort scale" /></div>
+        <label className="row" style={{ gap: 10, alignItems: "flex-start" }}>
+          <input type="checkbox" style={{ marginTop: 4 }} checked={showAll} onChange={(e) => setAdv(e.target.checked)} />
+          <span><span>Show all tools</span><div className="faint xs">Adds Volume, Exercises, Machines, Rep max and the experimental bar path, pose and scale tools. Off keeps the app to Train, Plan, Progress and More.</div></span>
+        </label>
         <div className="field"><span>Theme</span><Seg full value={settings.theme} onChange={(theme) => { setSettings({ theme }); }} options={[{ v: "auto", label: "System" }, { v: "dark", label: "Dark" }, { v: "light", label: "Light" }]} /></div>
         <div className="field"><span>Language</span><Seg full value={getLang()} onChange={(l) => l !== getLang() && setLang(l)} options={[{ v: "en", label: "English" }, { v: "el", label: "Ελληνικά" }]} label="Language" /></div>
       </section>
@@ -245,7 +257,7 @@ export function More() {
 
       <section className="panel stack" style={{ padding: 16 }}>
         <h3>Your data</h3>
-        <p className="dim small">Your log is stored on this device, works offline and syncs to your account. A backup file is still worth keeping.</p>
+        <p className="dim small">Your log is stored on this device, works offline and syncs to your account. A backup file is still worth keeping. <a href="/privacy.html" target="_blank" rel="noreferrer" style={{ color: "var(--accent)" }}>Privacy notice</a>.</p>
         <div className="row wrap">
           <button className="btn" onClick={async () => save(`ledger-backup-${new Date().toISOString().slice(0, 10)}.json`, await st.exportAll(), "application/json")}><Download size={18} /> Backup (JSON)</button>
           <button className="btn" onClick={() => file.current?.click()}><Upload size={18} /> Restore backup</button>

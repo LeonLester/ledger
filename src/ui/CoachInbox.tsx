@@ -1,10 +1,36 @@
 import { useState } from "react";
 import { api } from "../api";
 import { useStore } from "../store";
-import { useSync, syncNow } from "../sync";
+import { useSync, syncNow, sendMessage, deleteMessage } from "../sync";
 import type { Generated } from "../data/templates";
 
 const when = (t: number) => new Date(t).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+
+/** One message in a thread, with a delete link on the client's own. */
+function Msg({ c }: { c: { id: string; body: string; created: number; coach: string; fromClient?: number } }) {
+  const say = useStore((s) => s.say);
+  const mine = !!c.fromClient;
+  return (
+    <div className={`msg ${mine ? "mine" : ""}`}>
+      <div className="faint xs">{mine ? "You" : c.coach}, {when(c.created)}{mine && <button className="linkbtn" onClick={() => void deleteMessage(c.id).catch((e) => say(e.message))}>Delete</button>}</div>
+      <div>{c.body}</div>
+    </div>
+  );
+}
+
+/** A one-line box to write to your coach, about a session or in general. */
+export function ReplyBox({ sessionId, placeholder }: { sessionId?: string; placeholder: string }) {
+  const say = useStore((s) => s.say);
+  const [t, setT] = useState("");
+  const [busy, setBusy] = useState(false);
+  const go = async () => { setBusy(true); try { await sendMessage(t.trim(), sessionId); setT(""); say("Sent to your coach"); } catch (e) { say((e as Error).message); } finally { setBusy(false); } };
+  return (
+    <form className="row" style={{ gap: 8, flexWrap: "nowrap" }} onSubmit={(e) => { e.preventDefault(); if (t.trim()) void go(); }}>
+      <input className="input" placeholder={placeholder} aria-label={placeholder} maxLength={2000} value={t} onChange={(e) => setT(e.target.value)} />
+      <button className="btn sm primary" disabled={!t.trim() || busy}>Send</button>
+    </form>
+  );
+}
 
 /** Programs your coach assigned and the latest feedback they left. */
 export function CoachInbox() {
@@ -12,8 +38,8 @@ export function CoachInbox() {
   const { createProgram, say } = useStore();
   const [busy, setBusy] = useState("");
   const pending = assignments.filter((a) => a.state === "sent");
-  const recent = comments.filter((c) => !c.sessionId).slice(0, 3);
-  if (!user?.coachId || (!pending.length && !recent.length)) return null;
+  const recent = comments.filter((c) => !c.sessionId).slice(0, 4).reverse();
+  if (!user?.coachId) return null;
   const start = async (id: string) => {
     const a = assignments.find((x) => x.id === id)!;
     setBusy(id);
@@ -34,19 +60,22 @@ export function CoachInbox() {
           <button className="btn sm primary" disabled={busy === a.id} onClick={() => void start(a.id)}>Start this program</button>
         </div>
       ))}
-      {recent.map((c) => <div key={c.id}><div className="faint xs">{c.coach}, {when(c.created)}</div><div>{c.body}</div></div>)}
+      {recent.map((c) => <Msg key={c.id} c={c} />)}
+      <ReplyBox placeholder={`Message ${user.coachName ?? "your coach"}`} />
     </section>
   );
 }
 
-/** Coach notes attached to one logged session. */
+/** Coach notes and your replies about one logged session. */
 export function SessionComments({ sessionId }: { sessionId: string }) {
-  const comments = useSync((s) => s.comments).filter((c) => c.sessionId === sessionId);
-  if (!comments.length) return null;
+  const comments = useSync((s) => s.comments).filter((c) => c.sessionId === sessionId).slice().reverse();
+  const coachId = useSync((s) => s.user?.coachId);
+  if (!coachId) return null;
   return (
     <section className="panel stack" style={{ padding: 14 }} aria-label="Coach feedback">
       <h3>Coach feedback</h3>
-      {comments.map((c) => <div key={c.id}><div className="faint xs">{c.coach}, {when(c.created)}</div><div>{c.body}</div></div>)}
+      {comments.map((c) => <Msg key={c.id} c={c} />)}
+      <ReplyBox sessionId={sessionId} placeholder="Reply or ask about this session" />
     </section>
   );
 }

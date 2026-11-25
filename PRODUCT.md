@@ -42,7 +42,7 @@ Coach and client work in one tool that is shaped like the coach's own workbook: 
 - Coach tools: client list, client logs and charts, comments per session, assigned programs, invite links and a coach code.
 - Sample data: the coach's real 2026 log or a generated year for any split.
 - Terminology: a mesocycle is one training block, a session is one workout, RIR is reps in reserve, e1RM is estimated one-rep max, letters like A1 and A2 mean the same letter is one superset and the number is the order inside it.
-- Not built: email confirmation, password reset, rate limits beyond sign-in and signup, iOS app.
+- Password reset and email confirmation need the EMAIL binding (see README); coach and admin reset links work without it. Not built: native iOS app, push notifications (email only), pushing edits into a running assigned program.
 
 ## Brand Commitments
 

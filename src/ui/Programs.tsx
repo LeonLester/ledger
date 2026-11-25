@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { CoachInbox } from "./CoachInbox";
 import { Upload } from "lucide-react";
 import { SamplePicker } from "./Samples";
 import { useStore } from "../store";
@@ -94,6 +95,7 @@ export function Welcome() {
     <div className="main" style={{ maxWidth: 720, margin: "0 auto" }}>
       <div className="stack-lg">
         <div className="page-head"><div><h1>Ledger</h1><p className="sub">An offline training log with auto-regulated sets, PR checks and bar path tracking. Your log works offline and syncs to your account.</p></div></div>
+        {!picking && <CoachInbox />}
         {!picking ? (
           <div className="stack">
             <button className="panel sess-row" onClick={() => setPicking(true)}><div><div className="name">Pick a program</div><div className="dim small">Upper lower, PPL, full body, any X and Y split, or a powerlifting program.</div></div></button>

@@ -263,3 +263,71 @@ export const EL_PATTERNS: [RegExp, (t: Tr, ...m: string[]) => string][] = [
   [/^Preview: (.+)$/, (t, a) => `Προεπισκόπηση: ${a}`],
   [/^(.*) to (.*)$/, (t, a, b) => (/^\d+$/.test(a) && /^\d+$/.test(b)) ? `${a} έως ${b}` : `${a} to ${b}`],
 ];
+
+/* Added with accounts, coaching and live sync. */
+Object.assign(EL, {
+  // sign in, reset, consent
+  "Reset your password": "Επαναφορά κωδικού", "Enter your email and we send you a link.": "Γράψε το email σου και θα σου στείλουμε έναν σύνδεσμο.",
+  "Choose a new password": "Επίλεξε νέο κωδικό", "Use at least 8 characters. You are signed in on this device afterwards and signed out everywhere else.": "Χρησιμοποίησε τουλάχιστον 8 χαρακτήρες. Μετά θα είσαι συνδεδεμένος σε αυτή τη συσκευή και αποσυνδεδεμένος παντού αλλού.",
+  "New password": "Νέος κωδικός", "(8 characters or more)": "(τουλάχιστον 8 χαρακτήρες)", "Send reset link": "Αποστολή συνδέσμου", "Save password": "Αποθήκευση κωδικού",
+  "Back to log in": "Πίσω στη σύνδεση", "Forgot your password?": "Ξέχασες τον κωδικό σου;",
+  "If an account exists for that address, a reset link is on its way. It works for an hour.": "Αν υπάρχει λογαριασμός με αυτή τη διεύθυνση, ο σύνδεσμος επαναφοράς είναι καθ' οδόν. Ισχύει για μία ώρα.",
+  "Email is not set up yet. Ask your coach to send you a reset link.": "Η αποστολή email δεν έχει ρυθμιστεί ακόμη. Ζήτα από τον προπονητή σου να σου στείλει σύνδεσμο επαναφοράς.",
+  "Your log works offline once you are signed in. Changes sync when you are back online. By creating an account you agree to the": "Το ημερολόγιό σου λειτουργεί χωρίς σύνδεση αφού συνδεθείς. Οι αλλαγές συγχρονίζονται όταν επανέλθεις στο διαδίκτυο. Δημιουργώντας λογαριασμό αποδέχεσαι την",
+  "privacy notice": "ειδοποίηση απορρήτου", "Privacy notice": "Ειδοποίηση απορρήτου",
+  "Before you start": "Πριν ξεκινήσεις", "Here is what Ledger does with your training data.": "Τι κάνει το Ledger με τα δεδομένα προπόνησής σου.",
+  "Your log is yours.": "Το ημερολόγιο είναι δικό σου.", "It lives on this device and syncs to your account. You can export it or delete it any time under More.": "Βρίσκεται σε αυτή τη συσκευή και συγχρονίζεται με τον λογαριασμό σου. Μπορείς να το εξαγάγεις ή να το διαγράψεις όποτε θέλεις από τα Περισσότερα.",
+  "A coach sees it only if you join one.": "Ένας προπονητής το βλέπει μόνο αν μπεις σε κάποιον.", "With a coach code, your coach can read your sessions, progress, profile and messages, send you programs and edit your plan. Leave them under More and the access ends.": "Με κωδικό προπονητή, ο προπονητής σου μπορεί να διαβάζει τις προπονήσεις, την πρόοδο, το προφίλ και τα μηνύματά σου, να σου στέλνει προγράμματα και να αλλάζει το πλάνο σου. Αν τον αφήσεις από τα Περισσότερα, η πρόσβαση τελειώνει.",
+  "Nothing is sold or used for ads.": "Τίποτα δεν πουλιέται και δεν χρησιμοποιείται για διαφημίσεις.", "Cloudflare hosts the data. Sign-in with Google is optional.": "Τα δεδομένα φιλοξενούνται στο Cloudflare. Η σύνδεση με Google είναι προαιρετική.",
+  "Read the full": "Διάβασε ολόκληρη την", "I understand, continue": "Κατάλαβα, συνέχεια",
+  "Confirm your email address so you can reset your password later.": "Επιβεβαίωσε τη διεύθυνση email σου για να μπορείς να επαναφέρεις τον κωδικό αργότερα.", "Send the email": "Αποστολή email", Sent: "Εστάλη",
+  "Confirmation email sent": "Το email επιβεβαίωσης εστάλη", "Email confirmed": "Το email επιβεβαιώθηκε",
+  // sync and devices
+  Syncing: "Συγχρονισμός", Offline: "Εκτός σύνδεσης", "Not synced": "Δεν συγχρονίστηκε", "Tap to sync now": "Πάτα για συγχρονισμό τώρα",
+  "Signed in on": "Συνδεδεμένος σε", "Sign out others": "Αποσύνδεση των άλλων", "This device": "Αυτή η συσκευή", "Sign out": "Αποσύνδεση", "Signed in earlier": "Συνδέθηκε νωρίτερα",
+  "Sign out everywhere except this device?": "Αποσύνδεση από παντού εκτός από αυτή τη συσκευή;", "Signed out of other devices": "Αποσυνδέθηκαν οι άλλες συσκευές", "Device signed out": "Η συσκευή αποσυνδέθηκε",
+  "Email me about coaching activity": "Στείλε μου email για δραστηριότητα προπόνησης", "New feedback, new programs and messages from your coach or client.": "Νέα σχόλια, νέα προγράμματα και μηνύματα από τον προπονητή ή τον πελάτη σου.",
+  // profile / intake
+  "Your profile": "Το προφίλ σου", "Helps your coach plan for you. Only your coach sees it.": "Βοηθά τον προπονητή σου να σχεδιάσει για σένα. Το βλέπει μόνο ο προπονητής σου.",
+  "Main goal": "Κύριος στόχος", "For example: add 10 kg to my squat": "Για παράδειγμα: +10 κιλά στο καθιστό", "Training experience": "Εμπειρία προπόνησης", Choose: "Επίλεξε",
+  "Under 1 year": "Κάτω από 1 έτος", "1 to 3 years": "1 έως 3 έτη", "3 to 5 years": "3 έως 5 έτη", "More than 5 years": "Περισσότερα από 5 έτη", "Days a week": "Ημέρες την εβδομάδα",
+  "Injuries or limits": "Τραυματισμοί ή περιορισμοί", "Anything else (schedule, equipment, food)": "Οτιδήποτε άλλο (πρόγραμμα, εξοπλισμός, διατροφή)", "Save profile": "Αποθήκευση προφίλ", "Profile saved": "Το προφίλ αποθηκεύτηκε",
+  "Show all tools": "Εμφάνιση όλων των εργαλείων", "Adds Volume, Exercises, Machines, Rep max and the experimental bar path, pose and scale tools. Off keeps the app to Train, Plan, Progress and More.": "Προσθέτει Όγκο, Ασκήσεις, Μηχανήματα, Rep max και τα πειραματικά εργαλεία διαδρομής μπάρας, στάσης και ζυγαριάς. Απενεργοποιημένο, η εφαρμογή μένει σε Προπόνηση, Πλάνο, Πρόοδο και Περισσότερα.",
+  ". They can see your log, progress, profile and messages, and send you programs, feedback and plan changes. Leaving ends that access.": ". Μπορεί να βλέπει το ημερολόγιο, την πρόοδο, το προφίλ και τα μηνύματά σου και να σου στέλνει προγράμματα, σχόλια και αλλαγές στο πλάνο. Αν φύγεις, η πρόσβαση τελειώνει.",
+  // messages
+  "Sent to your coach": "Εστάλη στον προπονητή σου", "Reply or ask about this session": "Απάντησε ή ρώτα για αυτή την προπόνηση", You: "Εσύ", Delete: "Διαγραφή", Send: "Αποστολή",
+  // coach
+  "Clients who need you come first.": "Πρώτοι εμφανίζονται οι πελάτες που σε χρειάζονται.", "On track": "Σε καλό δρόμο", "Has not logged a session": "Δεν έχει καταγράψει προπόνηση", "Program not started": "Το πρόγραμμα δεν ξεκίνησε",
+  Archived: "Αρχειοθετημένος", "No clients yet. Share your coach code or invite link.": "Δεν υπάρχουν πελάτες ακόμη. Μοιράσου τον κωδικό ή τον σύνδεσμο πρόσκλησης.",
+  Program: "Πρόγραμμα", Profile: "Προφίλ", Account: "Λογαριασμός", Goal: "Στόχος", Experience: "Εμπειρία", Notes: "Σημειώσεις",
+  "Locked out? Create a reset link and send it to": "Κλειδώθηκε έξω; Δημιούργησε σύνδεσμο επαναφοράς και στείλ' τον στον", "Create reset link": "Δημιουργία συνδέσμου επαναφοράς", "Reset link": "Σύνδεσμος επαναφοράς", "Reset link copied": "Ο σύνδεσμος αντιγράφηκε",
+  "Archive client": "Αρχειοθέτηση πελάτη", "Restore client": "Επαναφορά πελάτη", "Remove client": "Αφαίρεση πελάτη", "Archive hides a client from your list and keeps the link. Remove ends your access.": "Η αρχειοθέτηση κρύβει τον πελάτη από τη λίστα και κρατά τη σύνδεση. Η αφαίρεση τερματίζει την πρόσβασή σου.",
+  Unverified: "Μη επιβεβαιωμένο",
+  // program editor
+  "This client has no program yet. Assign one first.": "Αυτός ο πελάτης δεν έχει πρόγραμμα ακόμη. Στείλε του πρώτα ένα.", "This week has no sessions.": "Αυτή η εβδομάδα δεν έχει προπονήσεις.",
+  "Change exercises, sets, reps and effort. Their app updates as soon as you save, and they get a note in their messages. Their logged sessions are not touched.": "Άλλαξε ασκήσεις, σετ, επαναλήψεις και προσπάθεια. Η εφαρμογή τους ενημερώνεται μόλις αποθηκεύσεις και παίρνουν σημείωμα στα μηνύματα. Οι καταγεγραμμένες προπονήσεις δεν αλλάζουν.",
+  Block: "Μπλοκ", Week: "Εβδομάδα", Session: "Προπόνηση", Exercise: "Άσκηση", Sets: "Σετ", Reps: "Επαν.", RIR: "RIR", "Add exercise": "Προσθήκη άσκησης", "Apply the changes to": "Εφαρμογή των αλλαγών σε", "All weeks": "Όλες οι εβδομάδες",
+  "Note for the client (optional)": "Σημείωμα για τον πελάτη (προαιρετικό)", "For example: hack squat instead of leg press while your knee settles": "Για παράδειγμα: hack squat αντί για πρέσα ποδιών όσο ηρεμεί το γόνατο", "Discard changes": "Απόρριψη αλλαγών",
+});
+EL_PATTERNS.push(
+  [/^(\d+) waiting$/, (_t, n) => `${n} σε αναμονή`],
+  [/^Offline, (\d+) waiting$/, (_t, n) => `Εκτός σύνδεσης, ${n} σε αναμονή`],
+  [/^Not synced, (\d+) waiting$/, (_t, n) => `Δεν συγχρονίστηκε, ${n} σε αναμονή`],
+  [/^Signed in (\d{2}\/\d{2}\/\d{4})$/, (_t, d) => `Συνδέθηκε ${d}`],
+  [/^Message (.+)$/, (_t, n) => `Μήνυμα στον/στην ${n}`],
+  [/^No session in (\d+) days$/, (_t, n) => `Καμία προπόνηση εδώ και ${n} ημέρες`],
+  [/^(\d+) new messages?$/, (_t, n) => `${n} ${n === "1" ? "νέο μήνυμα" : "νέα μηνύματα"}`],
+  [/^(\d+) this week, (\d+) logged(, last .+)?$/, (t, a, b, last) => `${a} αυτή την εβδομάδα, ${b} καταγεγραμμένες${last ? `, τελευταία ${t(last.slice(7))}` : ""}`],
+  [/^(Show|Hide) archived \((\d+)\)$/, (_t, a, n) => `${a === "Show" ? "Εμφάνιση" : "Απόκρυψη"} αρχειοθετημένων (${n})`],
+  [/^(.+) has not filled in a profile yet\. They can do it under More\.$/, (_t, n) => `Ο/Η ${n} δεν έχει συμπληρώσει προφίλ ακόμη. Μπορεί να το κάνει από τα Περισσότερα.`],
+  [/^Edit (.+)'s program$/, (_t, n) => `Επεξεργασία προγράμματος: ${n}`],
+  [/^Week (\d+) only$/, (_t, n) => `Μόνο εβδομάδα ${n}`],
+  [/^Week (\d+) onward$/, (_t, n) => `Από την εβδομάδα ${n} και μετά`],
+  [/^Save and send to (.+)$/, (_t, n) => `Αποθήκευση και αποστολή στον/στην ${n}`],
+  [/^Program updated for (.+)$/, (_t, n) => `Το πρόγραμμα ενημερώθηκε για ${n}`],
+  [/^Edits to (\d+) sessions? are waiting\. You can switch session or week and keep editing before saving\.$/, (_t, n) => `Υπάρχουν αλλαγές σε ${n} προπόνηση/εις. Μπορείς να αλλάξεις προπόνηση ή εβδομάδα και να συνεχίσεις πριν αποθηκεύσεις.`],
+  [/^Locked out\? Create a reset link and send it to (.+) yourself\. It works once, for 24 hours\.$/, (_t, n) => `Κλειδώθηκε έξω; Δημιούργησε σύνδεσμο επαναφοράς και στείλ' τον μόνος σου στον/στην ${n}. Δουλεύει μία φορά, για 24 ώρες.`],
+  [/^(.+) archived$/, (_t, n) => `Ο/Η ${n} αρχειοθετήθηκε`],
+  [/^(.+) restored$/, (_t, n) => `Ο/Η ${n} επανήλθε`],
+  [/^(.+) removed$/, (_t, n) => `Ο/Η ${n} αφαιρέθηκε`],
+);

@@ -25,7 +25,7 @@ Regenerate the seed from the workbook: `SRC="/path/Training Log Leo 2026.xlsx" n
 - First install on the phone: open https://github.com/LeonLester/ledger/releases/tag/android-latest, download `ledger.apk`, allow installs from your browser.
 
 ## Accounts, sync and coaching
-- `worker/index.ts` is the API (Cloudflare Worker, D1 database `ledger`, binding `DB`). Tables are created on first request. Static files are still served from `dist/`; only `/api/*` runs the Worker.
+- `worker/index.ts` is the API (Cloudflare Worker, D1 database `ledger`, binding `DB`). The schema lives in `migrations/` and CI applies it before each deploy (`wrangler d1 migrations apply ledger --remote`, so the API token needs D1 edit permission). Locally run `npx wrangler d1 migrations apply ledger --local` once. Static files are still served from `dist/`; only `/api/*` runs the Worker.
 - Everyone signs up or logs in when the app opens. The log is still local first (IndexedDB, one database per account) and works offline; changes queue in an outbox and sync when online (last write wins per row). The first login on a device adopts any data from the earlier single-user version.
 - Coach accounts are created by ticking "I am a coach" at sign-up and entering the `COACH_KEY` secret (`npx wrangler secret put COACH_KEY`). A coach has a code; clients enter it at sign-up or under More. The Clients tab shows each client's log, progress, sheet, lets the coach leave feedback and assign programs (one of their own, or built from scratch). Clients see assignments and feedback on Train and Plan.
 - Local development: `npm run build && npx wrangler dev` serves the app and API together. Put `COACH_KEY=...` in `.dev.vars`.
@@ -54,3 +54,14 @@ Regenerate the seed from the workbook: `SRC="/path/Training Log Leo 2026.xlsx" n
 - **Upper Lower A/B, 6 days** is a ready split: Upper A, Lower A, Upper B, Lower B, Upper A, Lower A, rest in week 1, then the B-first mirror in week 2, repeating through the block.
 - **Custom builder:** put the same session on several days and it becomes "Name 1", "Name 2" with the same exercises. Tick "Use a different layout on even weeks" for a two-week rotation. Each week then keeps its own weekday layout, shown and editable under Plan, Weekly split.
 - **Exercise library:** rename an exercise by tapping its name. The change applies to the library, every plan and every logged session. Renaming onto an existing name merges the two.
+
+## Running it with real clients
+
+- **Email** (password reset, email confirmation, notifications): the Worker sends through an `EMAIL` binding (Cloudflare Email Service). Onboard your sending domain in the Cloudflare dashboard, add `"send_email": [{ "name": "EMAIL" }]` to `wrangler.jsonc`, optionally set `MAIL_FROM` (default `Ledger <no-reply@coachleonidas.com>`) and redeploy. Until then the app works without email: a coach creates a reset link per client (Clients, client, Profile) and admins can do the same from Admin.
+- **Backups**: D1 Time Travel keeps 30 days of point-in-time recovery. For an off-site copy run `npm run backup` (writes to `~/ledger-backups`). Do not upload backups to a CI artifact: the repo is public.
+- **Privacy**: `public/privacy.html` is the notice linked from sign-up, the consent screen and More. Review the wording before you rely on it; it is not legal advice.
+- **Client errors** are logged by the Worker (`client_error`) and visible under Observability in the Cloudflare dashboard.
+- **Simple mode**: clients see Train, Plan, Progress and More. More, Training, "Show all tools" reveals the rest, including the experimental bar path, pose, scale and lever tools. Coaches see everything.
+- **Staging**: `ledger-staging` is a separate Worker with its own D1 database (`ledger-staging`), no custom domain and no Google sign-in. Push to the `staging` branch to deploy it (`.github/workflows/staging.yml`), or run `npx wrangler deploy --env staging`. Its address is printed by the deploy. The staging database already has the schema applied.
+- **Live sync**: every account has a Durable Object (`Hub`) that holds its open WebSockets. When anything is written, the Worker pokes the account (and its coach), and open apps sync at once. The 60 second poll stays as a fallback. A coach watching a client's screen gets pokes from that client too.
+- **Editing a client's program**: Clients, client, Program. Edits apply to this week only, this week onward or all weeks, land in the client's app straight away and leave a note in their messages.

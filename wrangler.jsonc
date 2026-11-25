@@ -4,7 +4,21 @@
   "main": "worker/index.ts",
   "compatibility_date": "2026-11-01",
   "assets": { "directory": "./dist", "not_found_handling": "single-page-application", "run_worker_first": ["/api/*"] },
-  "d1_databases": [{ "binding": "DB", "database_name": "ledger", "database_id": "ded315e4-d370-45b5-8ba9-27c2453a7463" }],
+  "d1_databases": [{ "binding": "DB", "database_name": "ledger", "database_id": "ded315e4-d370-45b5-8ba9-27c2453a7463", "migrations_dir": "migrations" }],
+  "durable_objects": { "bindings": [{ "name": "HUB", "class_name": "Hub" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Hub"] }],
+  "observability": { "enabled": true },
   "vars": { "PUBLIC_ORIGIN": "https://ledger.coachleonidas.com", "GOOGLE_CLIENT_ID": "354815097557-3sef5saof4h49p1dbif4kpkdjfiom774.apps.googleusercontent.com" },
-  "routes": [{ "pattern": "ledger.coachleonidas.com", "custom_domain": true }]
+  "routes": [{ "pattern": "ledger.coachleonidas.com", "custom_domain": true }],
+  "env": {
+    /* Staging: its own Worker, its own database, no custom domain, no Google sign-in. Deploy with `wrangler deploy --env staging`. */
+    "staging": {
+      "name": "ledger-staging",
+      "workers_dev": true,
+      "d1_databases": [{ "binding": "DB", "database_name": "ledger-staging", "database_id": "c9fc68a2-91b0-4bd6-ab7c-962115854200", "migrations_dir": "migrations" }],
+      "durable_objects": { "bindings": [{ "name": "HUB", "class_name": "Hub" }] },
+      "observability": { "enabled": true },
+      "vars": {}
+    }
+  }
 }

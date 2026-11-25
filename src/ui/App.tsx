@@ -14,7 +14,9 @@ import { Auth } from "./Auth";
 import { Landing } from "./Landing";
 import { Component, type ReactNode } from "react";
 import { Coach } from "./Coach";
-import { logout, resume, setAfterPull, useSync, watchGoogleReturn } from "../sync";
+import { logout, markSeen, resume, setAfterPull, unreadCount, useSync, watchGoogleReturn } from "../sync";
+import { ConsentGate, SyncChip, VerifyBanner, needsConsent, useVerifyLink } from "./Account";
+import { SIMPLE_TABS, useShowAdvanced } from "../lib/mode";
 import { syncMealcost } from "../mealcost";
 import { Admin } from "./Admin";
 
@@ -31,7 +33,8 @@ function Drawer({ tab, onPick, onClose }: { tab: string; onPick: (t: string) => 
   const { user } = useSync();
   const avatar = useStore((s) => s.avatar);
   useEffect(() => { const k = (e: KeyboardEvent) => e.key === "Escape" && onClose(); window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); }, [onClose]);
-  const items = [...TABS.filter((t) => t.id !== "coach" || user?.role === "coach").map(({ id, label, Icon }) => ({ id: id as string, label, Icon })), ...(user?.admin ? [{ id: "admin", label: "Admin", Icon: Shield }] : [])];
+  const adv = useShowAdvanced(user?.role);
+  const items = [...TABS.filter((t) => (t.id !== "coach" || user?.role === "coach") && (adv || SIMPLE_TABS.has(t.id) || t.id === "coach")).map(({ id, label, Icon }) => ({ id: id as string, label, Icon })), ...(user?.admin ? [{ id: "admin", label: "Admin", Icon: Shield }] : [])];
   return (
     <div className="drawer-scrim" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <aside className="drawer" role="dialog" aria-modal="true" aria-label="Menu">
@@ -96,11 +99,15 @@ export function App() {
   /** signed-out visitors see the landing page first, unless they came from an invite or coach link, a login link, or the Android app */
   const landingOk = useMemo(() => {
     if (isNative) return false;
-    try { return !/invite=|coach=|#login|#signup/.test(location.hash) && !sessionStorage.getItem("ledger.invite") && !sessionStorage.getItem("ledger.coach"); } catch { return true; }
+    try { return !/invite=|coach=|reset=|verify=|#login|#signup/.test(location.hash) && !sessionStorage.getItem("ledger.invite") && !sessionStorage.getItem("ledger.coach"); } catch { return true; }
   }, []);
   const [entry, setEntry] = useState<"login" | "signup" | null>(() => (landingOk ? null : /#signup|invite=|coach=/.test(location.hash) ? "signup" : "login"));
   useEffect(() => { const h = (e: Event) => setTab((e as CustomEvent<"admin">).detail); window.addEventListener("ledger:tab", h); return () => window.removeEventListener("ledger:tab", h); }, []);
   const { phase, user } = useSync();
+  const adv = useShowAdvanced(user?.role);
+  const unread = useSync(unreadCount);
+  useVerifyLink();
+  useEffect(() => { if (tab === "train" && !openSession) markSeen(); }, [tab, openSession, unread]);
   const avatar = useStore((s) => s.avatar);
   const [drawer, setDrawer] = useState(false);
   const [fabHidden, setFabHidden] = useState(false);
@@ -121,8 +128,9 @@ export function App() {
     const mq = window.matchMedia("(prefers-color-scheme: dark)"); const on = () => syncSystemBars(settings.theme); mq.addEventListener("change", on);
     return () => mq.removeEventListener("change", on);
   }, [settings.theme]);
-  if (phase === "out") return entry ? <Auth initialMode={entry} onBack={landingOk ? () => setEntry(null) : undefined} /> : <Landing go={setEntry} />;
+  if (phase === "out") return <>{entry ? <Auth initialMode={entry} onBack={landingOk ? () => setEntry(null) : undefined} /> : <Landing go={setEntry} />}{toast && <div className="toast" role="status">{toast}</div>}</>;
   if (phase === "booting" || !ready) return <div className="main"><h1>Ledger</h1><p className="sub">Loading your log</p></div>;
+  if (needsConsent(user)) return <ConsentGate />;
   const noProgram = !settings.onboarded || mesos.length === 0;
   if (noProgram && user?.role !== "coach") return <Welcome />;
   return (
@@ -132,8 +140,8 @@ export function App() {
           <div className="brand"><span className="brand-full">Ledger</span>{collapsed && "L"}</div>
           <button className="nav-toggle" aria-label={collapsed ? "Expand the sidebar" : "Collapse the sidebar"} aria-expanded={!collapsed} onClick={() => setCollapsed(!collapsed)}>{collapsed ? <PanelLeftOpen size={20} /> : <PanelLeftClose size={20} />}</button>
         </div>
-        {TABS.filter((t) => t.id !== "coach" || user?.role === "coach").map(({ id, label, Icon }) => (
-          <button key={id} className={TABS.find((t) => t.id === id)?.side ? "side-only" : undefined} aria-current={tab === id ? "page" : undefined} title={collapsed ? label : undefined} onClick={() => { setTab(id as TabId); if (id !== "train") useStore.getState().closeSession(); }}><Icon size={22} strokeWidth={2.2} /><span className="nav-label">{label}</span></button>
+        {TABS.filter((t) => (t.id !== "coach" || user?.role === "coach") && (adv || SIMPLE_TABS.has(t.id) || t.id === "coach")).map(({ id, label, Icon }) => (
+          <button key={id} className={TABS.find((t) => t.id === id)?.side ? "side-only" : undefined} aria-current={tab === id ? "page" : undefined} title={collapsed ? label : undefined} onClick={() => { setTab(id as TabId); if (id !== "train") useStore.getState().closeSession(); }}><span className="ico"><Icon size={22} strokeWidth={2.2} />{id === "train" && unread > 0 && <i className="dot" aria-label={`${unread} new messages`} />}</span><span className="nav-label">{label}</span></button>
         ))}
         {user && (
           <div className="nav-extra nav-account">
@@ -148,6 +156,7 @@ export function App() {
       {!openSession && <button className={`menu-fab ${fabHidden ? "away" : ""}`} aria-label="Open the menu" onClick={() => setDrawer(true)}><Menu size={20} /></button>}
       {drawer && <Drawer tab={tab} onClose={() => setDrawer(false)} onPick={(t) => { setTab(t as typeof tab); useStore.getState().closeSession(); setDrawer(false); }} />}
       <main className="main" id="main" data-open={openSession ? "1" : undefined}>
+        {!openSession && <><VerifyBanner /><SyncChip /></>}
         <Boundary reset={tab}>{noProgram && ["train", "plan", "volume", "progress"].includes(tab) ? <Welcome /> : <>
           {tab === "train" && <Train />}{tab === "plan" && <Plan />}{tab === "volume" && <Volume />}{tab === "progress" && <Progress />}{tab === "coach" && <Coach />}{tab === "exercises" && <Exercises />}{tab === "machines" && <Machines />}{tab === "repmax" && <RepMax />}{tab === "more" && <More />}{tab === "admin" && user?.admin && <Admin onBack={() => setTab("more")} />}</>}</Boundary>
       </main>

@@ -7,6 +7,7 @@
     "dev": "vite --host",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host",
+    "backup": "wrangler d1 export ledger --remote --output \"$HOME/ledger-backups/ledger-$(date +%F).sql\"",
     "seed": "python3 scripts/build_seed.py \"$SRC\" src/data/seed.json",
     "deploy": "npm run build && wrangler deploy",
     "build:web": "node scripts/build-web.mjs",

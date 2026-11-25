@@ -63,11 +63,11 @@ rounded:
   swatch: "2px"
   tag: "4px"
   control: "6px"
-  panel: "8px"
+  panel: "18px"
   sheet: "12px"
 spacing:
   xs: "4px"
-  sm: "8px"
+  sm: "12px"
   md: "16px"
   lg: "24px"
   touch: "44px"

@@ -4,7 +4,7 @@ import { api } from "../api";
 import { HOME } from "../native";
 import { useStore } from "../store";
 
-interface U { id: string; name: string; email: string; role: "athlete" | "coach"; created: number; google: number; password: number; coach: string | null; last: number | null; clients: number }
+interface U { id: string; name: string; email: string; role: "athlete" | "coach"; created: number; google: number; password: number; verified: number; coach: string | null; last: number | null; clients: number }
 interface Req { id: string; name: string; email: string; note: string | null; created: number }
 interface Inv { id: string; token: string; email: string | null; note: string | null; created: number; expires: number; used: number | null; usedBy: string | null }
 interface Overview { stats: { users: number; coaches: number; week: number }; users: U[]; requests: Req[]; invites: Inv[] }
@@ -88,12 +88,12 @@ export function Admin({ onBack }: { onBack: () => void }) {
               {users.map((u) => (
                 <tr key={u.id}>
                   <td className="lib-n" title={u.name}>{u.name}</td>
-                  <td style={{ padding: "0 8px" }}>{u.email}</td>
+                  <td style={{ padding: "0 8px" }}>{u.email}{!u.verified && <span className="pill warn" style={{ marginLeft: 6 }}>Unverified</span>}</td>
                   <td style={{ padding: "0 8px" }}>{u.role}{u.role === "coach" ? ` (${u.clients})` : u.coach ? `, ${u.coach}` : ""}</td>
                   <td style={{ padding: "0 8px" }}>{day(u.created)}</td>
                   <td style={{ padding: "0 8px" }}>{day(u.last)}</td>
                   <td style={{ padding: "0 8px" }}>{[u.google ? "Google" : "", u.password ? "Password" : ""].filter(Boolean).join(" + ")}</td>
-                  <td style={{ padding: "0 6px" }}>{u.role === "athlete"
+                  <td style={{ padding: "0 6px", whiteSpace: "nowrap" }}><button className="btn sm" onClick={() => void api<{ link: string }>("/api/admin/reset", { userId: u.id }).then((r) => { void navigator.clipboard?.writeText(r.link); say("Reset link copied"); }).catch((e) => say(e.message))}>Reset link</button> {u.role === "athlete"
                     ? <button className="btn sm" onClick={() => void act("/api/admin/role", { userId: u.id, role: "coach" }, `${u.name} is now a coach`)}>Make coach</button>
                     : <button className="btn sm" onClick={() => confirm(`Make ${u.name} an athlete? Their clients are unlinked.`) && void act("/api/admin/role", { userId: u.id, role: "athlete" }, `${u.name} is now an athlete`)}>Remove coach</button>}</td>
                 </tr>

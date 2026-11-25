@@ -3,7 +3,7 @@ import { create } from "zustand";
 import { useStore } from "../store";
 import type { Adjustment, BodyWeight, ExerciseDef, Feedback, Meso, Seed, Session, Settings } from "../types";
 
-export interface ClientView { id: string; name: string; email: string; data: Record<string, any[]>; comments: { id: string; sessionId: string | null; body: string; created: number }[]; assignments: { id: string; name: string; note: string | null; state: string; created: number }[] }
+export interface ClientView { id: string; name: string; email: string; data: Record<string, any[]>; comments: { id: string; sessionId: string | null; body: string; created: number; fromClient?: number }[]; assignments: { id: string; name: string; note: string | null; state: string; created: number }[] }
 /** When set, the Progress screens render this client's data read-only instead of your own. */
 export const useViewing = create<{ client: ClientView | null; set(c: ClientView | null): void }>((set) => ({ client: null, set: (client) => set({ client }) }));
 
