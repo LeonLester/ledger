@@ -15,6 +15,7 @@
     "staging": {
       "name": "ledger-staging",
       "workers_dev": true,
+      "routes": [],
       "d1_databases": [{ "binding": "DB", "database_name": "ledger-staging", "database_id": "c9fc68a2-91b0-4bd6-ab7c-962115854200", "migrations_dir": "migrations" }],
       "durable_objects": { "bindings": [{ "name": "HUB", "class_name": "Hub" }] },
       "observability": { "enabled": true },
